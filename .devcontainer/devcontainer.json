@@ -1,0 +1,17 @@
+{
+  "name": "charlie",
+  // The order of the files is important since later files override previous ones
+  "dockerComposeFile": ["./docker/docker-compose.yml"],
+  "service": "charlie",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}
