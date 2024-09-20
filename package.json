@@ -45,6 +45,8 @@
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.623.0",
+    "@google/generative-ai": "^0.19.0",
+    "@openapi-contrib/json-schema-to-openapi-schema": "^3.0.2",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
     "expr-eval": "^2.0.2",

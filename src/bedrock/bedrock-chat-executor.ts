@@ -157,7 +157,10 @@ export class BedrockChatExecutor implements ChatExecutor {
             {
               function: {
                 name: contentBlock.toolUse!.name!,
-                arguments: contentBlock.toolUse.input,
+                arguments: contentBlock.toolUse.input as unknown as Record<
+                  string,
+                  unknown
+                >,
               },
               id: contentBlock.toolUse.toolUseId!,
               type: "function",

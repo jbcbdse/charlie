@@ -57,7 +57,7 @@ export class InlineToolCallParser implements ChatMessageTransformer {
             return calls.map((call) => ({
               function: {
                 name: "name" in call ? call.name : call.tool,
-                arguments: call.arguments,
+                arguments: call.arguments as Record<string, unknown>,
               },
               id: `call_${uuidv4()}`,
               type: "function" as const,

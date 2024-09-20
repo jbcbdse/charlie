@@ -11,9 +11,13 @@ import { BedrockChatExecutor } from "../../bedrock/bedrock-chat-executor";
 import { InlineToolCallParser } from "../../bedrock/inline-tool-call-parser";
 import { ToolAssistantFilter } from "../../core/tool-assistant-filter";
 import { EventName, events } from "../../core";
+import { GeminiExecutor } from "../../google/gemini-executor";
 
 events.on(EventName.ChatRawRequest, (data) => {
-  console.debug("ChatRawRequest", JSON.stringify(data, null, 2));
+  console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
+});
+events.on(EventName.ChatRawResponse, (data) => {
+  console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
 });
 const promptTemplate = [
   "You are a helpful but rude, sarcastic assistant, but keep it PG-13. Use 1 emoji in every response",
@@ -32,7 +36,7 @@ type AvailableAgent =
   | "llama3"
   | "titan"
   | "gpt4o"
-  | "gpto1";
+  | "gemini";
 const agents: Record<AvailableAgent, ChatAgent> = {
   claude: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -77,10 +81,10 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
   }),
-  gpto1: new AiChatAgent({
-    chatExecutor: new OpenAiChatExecutor({
-      modelId: "o1-preview",
-      apiKey: process.env.OPENAI_API_KEY!,
+  gemini: new AiChatAgent({
+    chatExecutor: new GeminiExecutor({
+      modelId: "gemini-1.5-flash",
+      apiKey: process.env.GOOGLE_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
   }),
@@ -94,7 +98,7 @@ const messageHistory: ChatMessage[] = [];
 const availableAgents: AvailableAgent[] = Object.keys(
   agents,
 ) as AvailableAgent[];
-let currentAgent: AvailableAgent = "gpt4o";
+let currentAgent: AvailableAgent = "gemini";
 
 async function handleChat(input: string): Promise<string> {
   const userMessage: MessageUser = {

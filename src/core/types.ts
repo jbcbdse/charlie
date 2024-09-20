@@ -54,7 +54,7 @@ export interface ToolCall {
   function: {
     name: string;
     /** This should be the actual value passed to the tool, after it has been parsed from the AI response */
-    arguments: unknown;
+    arguments: Record<string, unknown>;
   };
 }
 /**
