@@ -1,6 +1,5 @@
 import { CalculatorTool } from "../tools/calculator.tool";
 import { AiChatAgent } from "./ai-chat-agent";
-import { ILogger } from "./logger";
 import {
   ChatAgentGetResponseInput,
   ChatAgentGetResponseOutput,
@@ -59,13 +58,11 @@ describe("AiChatAgent", () => {
     chatExecutor = new MockExecutor();
     agent = new AiChatAgent({
       chatExecutor,
-      logger: mock<ILogger>(),
     });
   });
   describe("getResponse", () => {
     it("should return a response message", async () => {
       const response = await agent.getResponse({
-        context: {},
         messages: [{ role: "user", content: "Hey buddy" }],
         tools: [new CalculatorTool()],
       });
@@ -75,7 +72,6 @@ describe("AiChatAgent", () => {
     });
     it("should call a tool and return the response, along with intermediate steps including tool calls", async () => {
       const response = await agent.getResponse({
-        context: {},
         messages: [{ role: "user", content: "Calculate 3 + 4" }],
         tools: [new CalculatorTool()],
       });

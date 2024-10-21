@@ -100,6 +100,7 @@ interface ChatAgentContentMeta {
 }
 export interface ChatAgentContext {
   runId: string;
+  executionId?: string;
   modelId: string;
   messages: ChatMessage[];
   meta: ChatAgentContentMeta;
@@ -110,9 +111,15 @@ export interface ChatAgentGetResponseInput {
   systemPrompt?: string;
   meta?: ChatAgentContentMeta;
 }
+export interface UsageMetadata {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+}
 export interface ChatAgentGetResponseOutput {
   responseMessage: ChatMessage;
   responseMessages: ChatMessage[];
+  usage?: UsageMetadata;
 }
 export interface ChatAgent {
   getResponse(
@@ -130,6 +137,10 @@ export interface ChatExecutor {
    * The id of the model to use for this executor, specific to the model within the given API
    */
   modelId: string;
+  /**
+   * The name of the provider of the model, such as "openai" or "bedrock"
+   */
+  modelProvider: string;
   execute(input: ChatExecutorInput): Promise<ChatAgentGetResponseOutput>;
 }
 

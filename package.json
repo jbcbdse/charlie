@@ -7,7 +7,8 @@
     "./package.json": "./package.json",
     "./core": "./dist/core/index.js",
     "./bedrock": "./dist/bedrock/index.js",
-    "./openai": "./dist/openai/index.js"
+    "./openai": "./dist/openai/index.js",
+    "./datadog": "./dist/datadog/index.js"
   },
   "files": [
     "dist/",
@@ -17,7 +18,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node -r ts-node/register -r dotenv/config",
+    "start:repl": "node -r ts-node/register -r dotenv/config src/examples/repl/index.ts",
     "lint:fix": "eslint -c ./eslint.config.mjs --fix src/",
     "lint": "eslint -c ./eslint.config.mjs src/",
     "test": "jest"
@@ -48,6 +49,7 @@
     "@google/generative-ai": "^0.19.0",
     "@openapi-contrib/json-schema-to-openapi-schema": "^3.0.2",
     "axios": "^1.7.7",
+    "dd-trace": "^5.22.0",
     "dotenv": "^16.4.5",
     "expr-eval": "^2.0.2",
     "lodash.get": "^4.4.2",

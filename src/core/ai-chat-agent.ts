@@ -7,12 +7,14 @@ import {
   MessageToolCall,
   ChatAgentContext,
   MessageTool,
+  UsageMetadata,
 } from "./types";
 import { ToolExecutor } from "./tool-executor";
 import { EventName, eventProducer, EventProducer } from "./event-producer";
 import { newRunId } from "./new-run-id";
 import { BaseTool } from "./base-tool";
 import { TemplateSerializer } from "./template-serializer";
+import { getCurrentTime } from "./get-current-time";
 
 export class AiChatAgent implements ChatAgent {
   private chatExecutor: ChatExecutor;
@@ -61,19 +63,28 @@ export class AiChatAgent implements ChatAgent {
     context.runId = newRunId();
     context.modelId = this.chatExecutor.modelId;
     context.messages = messages;
-    const chatStartMs = Date.now();
+    const chatStartMs = getCurrentTime();
     this.eventProducer.emit(EventName.ChatStart, {
       context,
       messages,
       systemPrompt,
       modelId: this.chatExecutor.modelId,
+      modelProivder: this.chatExecutor.modelProvider,
+      startTime: chatStartMs,
     });
+    const usage: UsageMetadata = {
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+    };
     do {
-      const chatExecutorStartMs = Date.now();
+      const chatExecutorStartMs = getCurrentTime();
       this.eventProducer.emit(EventName.ChatExecutorStart, {
         context,
         messages,
         modelId: this.chatExecutor.modelId,
+        modelProvider: this.chatExecutor.modelProvider,
+        startTime: chatExecutorStartMs,
       });
       const response = await this.chatExecutor.execute({
         messages,
@@ -88,10 +99,17 @@ export class AiChatAgent implements ChatAgent {
       responseMessages.push(...newResponseMessages);
       this.eventProducer.emit(EventName.ChatExecutorEnd, {
         context,
-        messages: newResponseMessages,
+        messages: messages,
+        responseMessages: newResponseMessages,
         modelId: this.chatExecutor.modelId,
-        timeMs: Date.now() - chatExecutorStartMs,
+        modelProvider: this.chatExecutor.modelProvider,
+        startTime: chatExecutorStartMs,
+        timeMs: getCurrentTime() - chatExecutorStartMs,
+        usage: response.usage,
       });
+      usage.inputTokens += response.usage?.inputTokens || 0;
+      usage.outputTokens += response.usage?.outputTokens || 0;
+      usage.totalTokens += response.usage?.totalTokens || 0;
       const toolCalls = newResponseMessages.filter(
         (m) => m.role === "tool_call",
       );
@@ -117,12 +135,16 @@ export class AiChatAgent implements ChatAgent {
     const response = {
       responseMessage: responseMessages[responseMessages.length - 1],
       responseMessages,
+      usage,
     };
     this.eventProducer.emit(EventName.ChatEnd, {
       context,
       messages: response.responseMessages,
       modelId: this.chatExecutor.modelId,
-      timeMs: Date.now() - chatStartMs,
+      modelProvider: this.chatExecutor.modelProvider,
+      startTime: chatStartMs,
+      timeMs: getCurrentTime() - chatStartMs,
+      usage,
     });
     return response;
   }
@@ -132,10 +154,11 @@ export class AiChatAgent implements ChatAgent {
     tools: BaseTool[],
     context: ChatAgentContext,
   ): Promise<MessageTool[]> {
-    const toolStartMs = Date.now();
+    const toolStartMs = getCurrentTime();
     this.eventProducer.emit(EventName.ToolsStart, {
       context,
       toolCalls,
+      startTime: toolStartMs,
     });
     const toolMessages = await Promise.all(
       toolCalls.map((toolCall) =>
@@ -145,7 +168,8 @@ export class AiChatAgent implements ChatAgent {
     this.eventProducer.emit(EventName.ToolsEnd, {
       context,
       toolMessages,
-      timeMs: Date.now() - toolStartMs,
+      startTime: toolStartMs,
+      timeMs: getCurrentTime() - toolStartMs,
     });
     return toolMessages;
   }

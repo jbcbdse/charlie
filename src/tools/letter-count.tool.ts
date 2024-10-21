@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { BaseTool } from "../core/base-tool";
+import { setTimeout as sleep } from "timers/promises";
 
 export class CountLettersTool extends BaseTool {
   public name = CountLettersTool.name;
@@ -13,7 +14,10 @@ export class CountLettersTool extends BaseTool {
       .string()
       .describe("The letter you want to count in the word or phrase."),
   });
-  public handler({ word, letter }: z.infer<typeof this.schema>): string {
+  public async handler({
+    word,
+    letter,
+  }: z.infer<typeof this.schema>): Promise<string> {
     const count = word.toLowerCase().split(letter.toLowerCase()).length - 1;
     return `There are ${count} "${letter.toUpperCase()}"s in "${word}".`;
   }

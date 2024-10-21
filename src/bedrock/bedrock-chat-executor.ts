@@ -18,10 +18,12 @@ import {
   eventProducer,
   EventProducer,
 } from "../core/event-producer";
+import { getCurrentTime } from "../core/get-current-time";
 
 export class BedrockChatExecutor implements ChatExecutor {
   private client: BedrockRuntime;
   public modelId: string;
+  public modelProvider = "bedrock";
   private toolPromptGenerator: ToolPromptGenerator;
   private messageConverter: MessageConverter;
   private logger: ILogger;
@@ -101,18 +103,20 @@ export class BedrockChatExecutor implements ChatExecutor {
             }
           : undefined,
     };
-    const chatExecutorStartMs = Date.now();
+    const chatExecutorStartMs = getCurrentTime();
     this.eventProducer.emit(EventName.ChatRawRequest, {
       context,
       request,
       modelId: this.modelId,
+      modelProvider: this.modelProvider,
     });
     const response = await this.client.converse(request);
     this.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       response: response,
       modelId: this.modelId,
-      timeMs: Date.now() - chatExecutorStartMs,
+      modelProvider: this.modelProvider,
+      timeMs: getCurrentTime() - chatExecutorStartMs,
     });
     const responseMessages = this.parseResponseContent(
       response.output!.message!.content!,
@@ -120,6 +124,12 @@ export class BedrockChatExecutor implements ChatExecutor {
     return {
       responseMessage: responseMessages[responseMessages.length - 1],
       responseMessages,
+      usage: response.usage && {
+        // AWS is so cute making everything optional
+        inputTokens: response.usage.inputTokens || 0,
+        outputTokens: response.usage.outputTokens || 0,
+        totalTokens: response.usage.totalTokens || 0,
+      },
     };
   }
 

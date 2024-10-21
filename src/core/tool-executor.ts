@@ -1,5 +1,6 @@
 import { BaseTool } from "./base-tool";
 import { EventName, eventProducer, EventProducer } from "./event-producer";
+import { getCurrentTime } from "./get-current-time";
 import { ChatAgentContext, MessageTool, MessageToolCall } from "./types";
 
 /**
@@ -30,11 +31,12 @@ export class ToolExecutor {
             status: "error" as const,
           };
         }
-        const toolStartMs = Date.now();
+        const toolStartMs = getCurrentTime();
         this.eventProducer.emit(EventName.ToolStart, {
           context,
           toolCall: toolCallMessage,
           toolCallId: toolCall.id,
+          startTime: toolStartMs,
         });
         const toolMessage = await tool
           .handle(toolCall.function.arguments, context)
@@ -54,7 +56,13 @@ export class ToolExecutor {
           }));
         this.eventProducer.emit(EventName.ToolEnd, {
           context,
-          timeMs: Date.now() - toolStartMs,
+          toolCall: {
+            role: "tool_call",
+            toolCalls: [toolCall],
+          },
+          toolCallId: toolCall.id,
+          startTime: toolStartMs,
+          timeMs: getCurrentTime() - toolStartMs,
           toolMessage: toolMessage,
         });
         return toolMessage;

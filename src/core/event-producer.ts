@@ -1,5 +1,11 @@
 import EventEmitter from "events";
-import { ChatAgentContext, ChatMessage } from "./types";
+import {
+  ChatAgentContext,
+  ChatMessage,
+  MessageTool,
+  MessageToolCall,
+  UsageMetadata,
+} from "./types";
 
 interface ChatEvent {
   context: ChatAgentContext;
@@ -9,46 +15,68 @@ interface ChatEndEvent extends ChatEvent {
 }
 export interface EventChatStart extends ChatEvent {
   modelId: string;
+  modelProivder: string;
   /**
    * Messages sent to the LLM
    */
   messages: ChatMessage[];
   systemPrompt?: string;
+  startTime: number;
 }
 export interface EventChatEnd extends ChatEndEvent {
   modelId: string;
+  modelProvider: string;
   /** Messages in response from the LLM */
   messages: ChatMessage[];
+  usage: UsageMetadata;
+  startTime: number;
+  timeMs: number;
 }
 export interface EventToolsStart extends ChatEvent {
   toolCalls: ChatMessage[];
+  startTime: number;
 }
 export interface EventToolsEnd extends ChatEndEvent {
   toolMessages: ChatMessage[];
+  startTime: number;
+  timeMs: number;
 }
 export interface EventToolStart extends ChatEvent {
   toolCall: ChatMessage;
   toolCallId: string;
+  startTime: number;
 }
 export interface EventToolEnd extends ChatEndEvent {
-  toolMessage: ChatMessage;
+  toolCall: MessageToolCall;
+  toolMessage: MessageTool;
+  toolCallId: string;
+  startTime: number;
 }
 export interface EventChatExecutorStart extends ChatEvent {
   modelId: string;
+  modelProvider: string;
   messages: ChatMessage[];
   systemPrompt?: string;
+  startTime: number;
 }
 export interface EventChatExecutorEnd extends ChatEndEvent {
   modelId: string;
+  modelProvider: string;
   messages: ChatMessage[];
+  responseMessages: ChatMessage[];
+  usage?: UsageMetadata;
+  startTime: number;
+  timeMs: number;
 }
 export interface EventChatRawRequest extends ChatEvent {
   modelId: string;
+  modelProvider: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   request: any;
 }
 export interface EventChatRawResponse extends ChatEndEvent {
   modelId: string;
+  modelProvider: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   response: any;
 }

@@ -14,12 +14,14 @@ import {
   EventProducer,
 } from "../core/event-producer";
 import zodToJsonSchema from "zod-to-json-schema";
+import { getCurrentTime } from "../core/get-current-time";
 
 export class OpenAiChatExecutor implements ChatExecutor {
   private apiKey: string;
   private axios: AxiosInstance;
   private eventProducer: EventProducer;
   public modelId: string;
+  public modelProvider = "openai";
   constructor(
     private options: {
       modelId: string;
@@ -64,11 +66,12 @@ export class OpenAiChatExecutor implements ChatExecutor {
           },
         })),
     };
-    const chatExecutorStartMs = Date.now();
+    const chatExecutorStartMs = getCurrentTime();
     this.eventProducer.emit(EventName.ChatRawRequest, {
       context,
       request,
       modelId: this.modelId,
+      modelProvider: this.modelProvider,
     });
     const response = await this.axios.post(
       "https://api.openai.com/v1/chat/completions",
@@ -85,7 +88,8 @@ export class OpenAiChatExecutor implements ChatExecutor {
       context,
       response: data,
       modelId: this.modelId,
-      timeMs: Date.now() - chatExecutorStartMs,
+      modelProvider: this.modelProvider,
+      timeMs: getCurrentTime() - chatExecutorStartMs,
     });
     if (response.status !== 200) {
       throw new Error(data.error.message);
@@ -95,6 +99,11 @@ export class OpenAiChatExecutor implements ChatExecutor {
     return {
       responseMessage: msg,
       responseMessages: [msg],
+      usage: {
+        inputTokens: data.usage?.prompt_tokens,
+        outputTokens: data.usage?.completion_tokens,
+        totalTokens: data.usage?.total_tokens,
+      },
     };
   }
 

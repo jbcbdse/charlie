@@ -1,9 +1,5 @@
 import { ChatExecutor } from "../core";
-import {
-  ChatAgentGetResponseOutput,
-  ChatExecutorInput,
-  ChatMessage,
-} from "../core/types";
+import { ChatAgentGetResponseOutput, ChatExecutorInput } from "../core/types";
 import {
   GenerateContentRequest,
   GenerativeModel,
@@ -12,9 +8,11 @@ import {
 import { ToolConverter } from "./tool-converter";
 import { MessageConverter } from "./message-converter";
 import { EventName, eventProducer } from "../core/event-producer";
+import { getCurrentTime } from "../core/get-current-time";
 
 export class GeminiExecutor implements ChatExecutor {
   public modelId: string;
+  public modelProvider = "google";
   private toolConverter: ToolConverter;
   private messageConverter: MessageConverter;
   private model: GenerativeModel;
@@ -39,18 +37,20 @@ export class GeminiExecutor implements ChatExecutor {
       tools: tools ? await this.toolConverter.toGeminiTools(tools) : [],
       systemInstruction: systemPrompt,
     };
-    const startMs = Date.now();
+    const startMs = getCurrentTime();
     eventProducer.emit(EventName.ChatRawRequest, {
       context,
       modelId: this.modelId,
+      modelProvider: this.modelProvider,
       request: req,
     });
     const response = await this.model.generateContent(req);
     eventProducer.emit(EventName.ChatRawResponse, {
       context,
       modelId: this.modelId,
+      modelProvider: this.modelProvider,
       response,
-      timeMs: Date.now() - startMs,
+      timeMs: getCurrentTime() - startMs,
     });
     const responseMessages = this.messageConverter.responseContentChatMessages(
       response.response.candidates![0].content,
@@ -58,6 +58,11 @@ export class GeminiExecutor implements ChatExecutor {
     return {
       responseMessage: responseMessages.at(-1)!,
       responseMessages,
+      usage: response.response.usageMetadata && {
+        inputTokens: response.response.usageMetadata.promptTokenCount,
+        outputTokens: response.response.usageMetadata.candidatesTokenCount,
+        totalTokens: response.response.usageMetadata.totalTokenCount,
+      },
     };
   }
 }

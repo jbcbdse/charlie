@@ -13,7 +13,7 @@ export class CalculatorTool extends BaseTool {
   });
   public handler({ expr }: z.TypeOf<typeof this.schema>): string {
     try {
-      return new Parser().parse(expr).evaluate().toString();
+      return `${expr} = ${new Parser().parse(expr).evaluate().toString()}`;
     } catch (e) {
       throw new Error(
         "Invalid expression. Only provide numbers and operators without variables. You may try again",

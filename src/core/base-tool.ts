@@ -33,5 +33,5 @@ export abstract class BaseTool implements ITool {
   public abstract handler(
     params: z.infer<typeof this.schema>,
     context: ChatAgentContext,
-  ): string;
+  ): string | Promise<string>;
 }

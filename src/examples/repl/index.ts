@@ -10,15 +10,25 @@ import { CalculatorTool } from "../../tools/calculator.tool";
 import { BedrockChatExecutor } from "../../bedrock/bedrock-chat-executor";
 import { InlineToolCallParser } from "../../bedrock/inline-tool-call-parser";
 import { ToolAssistantFilter } from "../../core/tool-assistant-filter";
-import { EventName, events } from "../../core";
+import { events } from "../../core";
 import { GeminiExecutor } from "../../google/gemini-executor";
+import { LlmSpansApi } from "../../datadog";
 
-events.on(EventName.ChatRawRequest, (data) => {
-  console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
-});
-events.on(EventName.ChatRawResponse, (data) => {
-  console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
-});
+console.log(process.env.DD_API_KEY);
+new LlmSpansApi({
+  apiKey: process.env.DD_API_KEY!,
+  tags: {
+    service: "charlie",
+    env: "dev",
+  },
+}).listen(events);
+
+// events.on(EventName.ChatRawRequest, (data) => {
+//   console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
+// });
+// events.on(EventName.ChatRawResponse, (data) => {
+//   console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
+// });
 const promptTemplate = [
   "You are a helpful but rude, sarcastic assistant, but keep it PG-13. Use 1 emoji in every response",
   "",
@@ -98,7 +108,7 @@ const messageHistory: ChatMessage[] = [];
 const availableAgents: AvailableAgent[] = Object.keys(
   agents,
 ) as AvailableAgent[];
-let currentAgent: AvailableAgent = "gemini";
+let currentAgent: AvailableAgent = "gpt4o";
 
 async function handleChat(input: string): Promise<string> {
   const userMessage: MessageUser = {
