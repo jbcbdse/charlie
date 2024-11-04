@@ -3,7 +3,40 @@ import {
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
-} from "../core";
+} from "../../core/src";
+
+interface TitanEmbeddingsRequest {
+  inputText: string;
+}
+interface TitanEmbeddingsResponse {
+  embedding: number[];
+  inputTextTokenCount: number;
+}
+export class TitanTextEmbeddingGenerator implements TextEmbeddingGenerator {
+  public modelId: string;
+  private client: BedrockRuntime;
+  constructor(options: { modelId: string; client?: BedrockRuntime }) {
+    this.modelId = options.modelId;
+    this.client = options.client || new BedrockRuntime({});
+  }
+
+  public async getEmbedding(input: { text: string }) {
+    const request: TitanEmbeddingsRequest = {
+      inputText: input.text,
+    };
+    const response = await this.client.invokeModel({
+      modelId: this.modelId,
+      body: JSON.stringify(request),
+    });
+    const data: TitanEmbeddingsResponse = JSON.parse(
+      Buffer.from(response.body).toString(),
+    );
+    return {
+      modelId: this.modelId,
+      embedding: data.embedding,
+    };
+  }
+}
 
 interface CohereTextEmbeddingRequest {
   texts: string[];

@@ -4,8 +4,8 @@ import {
   ChatMessageTransformer,
   MessageAssistant,
   MessageToolCall,
-} from "../core/types";
-import { ILogger, Logger } from "../core/logger";
+} from "../../core/src/types";
+import { ILogger, Logger } from "../../core/logger";
 /**
  * Some models do not produce tool call objects in the response, but instead include the tool call as a string in the response text. This class attempts to parse the tool call from the response text.
  */

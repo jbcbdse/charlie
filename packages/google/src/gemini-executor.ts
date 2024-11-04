@@ -1,9 +1,9 @@
-import { ChatExecutor } from "../core";
+import { ChatExecutor } from "../../core/src";
 import {
   ChatAgentGetResponseOutput,
   ChatExecutorInput,
   ChatMessage,
-} from "../core/types";
+} from "../../core/src/types";
 import {
   GenerateContentRequest,
   GenerativeModel,
@@ -11,7 +11,7 @@ import {
 } from "@google/generative-ai";
 import { ToolConverter } from "./tool-converter";
 import { MessageConverter } from "./message-converter";
-import { EventName, eventProducer } from "../core/event-producer";
+import { EventName, eventProducer } from "../../core/src/event-producer";
 
 export class GeminiExecutor implements ChatExecutor {
   public modelId: string;

@@ -3,7 +3,7 @@ import {
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
-} from "../core/types";
+} from "../../core/src/types";
 
 export interface OpenAiTextEmbeddingGeneratorOptions {
   apiKey: string;

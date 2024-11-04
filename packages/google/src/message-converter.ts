@@ -1,5 +1,5 @@
 import { Content, Part } from "@google/generative-ai";
-import { ChatMessage } from "../core";
+import { ChatMessage } from "../../core/src";
 
 export class MessageConverter {
   public toContentObjects(messages: ChatMessage[]): Content[] {

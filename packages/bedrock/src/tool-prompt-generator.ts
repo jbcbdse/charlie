@@ -1,4 +1,4 @@
-import { BaseTool } from "../core/base-tool";
+import { BaseTool } from "../../core/src/base-tool";
 
 export class ToolPromptGenerator {
   /**

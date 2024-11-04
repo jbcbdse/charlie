@@ -1,4 +1,4 @@
-import { CalculatorTool } from "../tools/calculator.tool";
+import { CalculatorTool } from "../../tools/src/calculator.tool";
 import { AiChatAgent } from "./ai-chat-agent";
 import { ILogger } from "./logger";
 import {
