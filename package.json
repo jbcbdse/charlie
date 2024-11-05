@@ -8,9 +8,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
+    "lint": "npm run lint --workspaces",
     "start": "node -r ts-node/register -r dotenv/config packages/examples/src/repl/index.ts",
-    "lint:fix": "eslint -c ./eslint.config.mjs --fix src/",
-    "lint": "eslint -c ./eslint.config.mjs src/",
     "test": "jest"
   },
   "author": "Jonathan Barnett",

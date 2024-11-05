@@ -6,10 +6,13 @@ import eslintPrettierPluginRecommended from "eslint-plugin-prettier/recommended"
 
 export default tseslint.config(
   eslint.configs.recommended,
-  ...tseslint.configs.recommended,
-  eslintPrettierPluginRecommended, // ignore the squiggle. It works
+  eslintPrettierPluginRecommended,
+  ...tseslint.configs.strict,
+  ...tseslint.configs.stylistic,
   {
-    files: ["src/**/*.ts"],
+    ignores: ["dist/**/*"],
+  },
+  {
     rules: {
       "no-console": "warn",
       quotes: ["error", "double", { avoidEscape: true }],

@@ -89,15 +89,12 @@ export type ChatMessage =
   | MessageAssistant
   | MessageToolCall
   | MessageTool;
-
 /**
  * Arbitrary data you can include in context that will be passed to tools and callbacks
  *
  * This property can also be referenced by prompt templates
  */
-interface ChatAgentContentMeta {
-  [key: string]: unknown;
-}
+type ChatAgentContentMeta = Record<string, unknown>;
 export interface ChatAgentContext {
   runId: string;
   modelId: string;

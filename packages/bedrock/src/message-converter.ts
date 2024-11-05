@@ -91,6 +91,7 @@ export class MessageConverter {
     for (const currentMessage of messages) {
       if (previousMessage) {
         if (currentMessage.role === previousMessage.role) {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           previousMessage.content!.push(...(currentMessage!.content || []));
         } else {
           previousMessage = currentMessage;

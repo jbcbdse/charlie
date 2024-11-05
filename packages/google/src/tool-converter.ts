@@ -22,6 +22,7 @@ export class ToolConverter {
     const openApiSchema: ReturnedSchema = await toOpenApi(tool.jsonSchema);
     const noArgs =
       openApiSchema.type === "object" &&
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       Object.keys(openApiSchema.properties!).length === 0;
     delete openApiSchema.additionalProperties;
     return {

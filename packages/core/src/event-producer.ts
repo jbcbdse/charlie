@@ -101,7 +101,7 @@ export enum EventName {
  * }
  * ```
  */
-export type EventTypeMap = {
+export interface EventTypeMap {
   [EventName.ChatStart]: EventChatStart;
   [EventName.ChatEnd]: EventChatEnd;
   [EventName.ToolsStart]: EventToolsStart;
@@ -112,7 +112,7 @@ export type EventTypeMap = {
   [EventName.ChatExecutorEnd]: EventChatExecutorEnd;
   [EventName.ChatRawRequest]: EventChatRawRequest;
   [EventName.ChatRawResponse]: EventChatRawResponse;
-};
+}
 
 export class EventProducer {
   public emitter = new EventEmitter();

@@ -45,8 +45,14 @@ export class InlineToolCallParser implements ChatMessageTransformer {
       this.logger.debug("Parsing inline function from response text", {
         text,
       });
-      type ExpectedToolCall = { name: string; arguments: unknown };
-      type TitanVariantToolCall = { tool: string; arguments: unknown };
+      interface ExpectedToolCall {
+        name: string;
+        arguments: unknown;
+      }
+      interface TitanVariantToolCall {
+        tool: string;
+        arguments: unknown;
+      }
       type ParsedToolCall = ExpectedToolCall | TitanVariantToolCall;
       return {
         role: "tool_call" as const,

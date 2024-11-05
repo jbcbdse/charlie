@@ -53,9 +53,11 @@ export class GeminiExecutor implements ChatExecutor {
       timeMs: Date.now() - startMs,
     });
     const responseMessages = this.messageConverter.responseContentChatMessages(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       response.response.candidates![0].content,
     );
     return {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       responseMessage: responseMessages.at(-1)!,
       responseMessages,
     };
