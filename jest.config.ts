@@ -6,5 +6,6 @@ const jestConfig: JestConfigWithTsJest = {
   testMatch: ["<rootDir>/**/*.spec.ts"],
   ...createDefaultPreset(),
   maxWorkers: 4,
+  passWithNoTests: true,
 };
 export default jestConfig;

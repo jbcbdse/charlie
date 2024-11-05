@@ -19,7 +19,7 @@ class CalculatorTool extends BaseTool {
       .describe("A valid mathematical expression. Do not use variables."),
   });
   public handler({ expr }: z.TypeOf<typeof this.schema>): string {
-    expr = expr.replaceAll(/[^0-9+\-*/\s]/, "");
+    expr = expr.replaceAll(/[^0-9+\-*/\s]/g, "");
     try {
       const ans = eval(expr).toString();
       return `${expr} = ${ans}`;
@@ -101,7 +101,9 @@ describe("AiChatAgent", () => {
       });
       const responseMessage = response.responseMessage as MessageAssistant;
       expect(responseMessage.role).toBe("assistant");
-      expect(responseMessage.content).toBe("The CalculatorTool tool said: 7");
+      expect(responseMessage.content).toBe(
+        "The CalculatorTool tool said: 3 + 4 = 7",
+      );
       expect(response.responseMessages).toMatchSnapshot();
     });
   });

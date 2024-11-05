@@ -18,14 +18,14 @@ exports[`AiChatAgent getResponse should call a tool and return the response, alo
     ],
   },
   {
-    "content": "7",
+    "content": "3 + 4 = 7",
     "name": "CalculatorTool",
     "role": "tool",
     "status": "success",
     "toolCallId": "toolcall1",
   },
   {
-    "content": "The CalculatorTool tool said: 7",
+    "content": "The CalculatorTool tool said: 3 + 4 = 7",
     "role": "assistant",
   },
 ]
