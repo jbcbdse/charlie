@@ -1,4 +1,4 @@
-import { BaseTool } from "../../core/src/base-tool";
+import { BaseTool } from "@ifit/charlie-core";
 import { z } from "zod";
 import { Parser } from "expr-eval";
 

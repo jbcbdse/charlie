@@ -1,4 +1,4 @@
-import { ChatMessage } from "../../core/src/types";
+import { ChatMessage } from "@ifit/charlie-core";
 import { Message } from "@aws-sdk/client-bedrock-runtime";
 
 export class MessageConverter {

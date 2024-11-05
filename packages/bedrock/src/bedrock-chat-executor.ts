@@ -8,16 +8,15 @@ import {
   ChatAgentGetResponseOutput,
   ChatMessage,
   ChatExecutorInput,
-} from "../../core/src/types";
-import { ILogger, Logger } from "../../core/logger";
-import { InlineToolCallParser } from "./inline-tool-call-parser";
-import { ToolPromptGenerator } from "./tool-prompt-generator";
-import { MessageConverter } from "./message-converter";
-import {
+  ILogger,
+  Logger,
   EventName,
   eventProducer,
   EventProducer,
-} from "../../core/src/event-producer";
+} from "@ifit/charlie-core";
+import { InlineToolCallParser } from "./inline-tool-call-parser";
+import { ToolPromptGenerator } from "./tool-prompt-generator";
+import { MessageConverter } from "./message-converter";
 
 export class BedrockChatExecutor implements ChatExecutor {
   private client: BedrockRuntime;

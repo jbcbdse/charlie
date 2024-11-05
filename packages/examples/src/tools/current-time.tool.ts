@@ -1,4 +1,4 @@
-import { BaseTool } from "../../core/src/base-tool";
+import { BaseTool } from "@ifit/charlie-core";
 import { z } from "zod";
 
 export class CurrentTimeTool extends BaseTool {

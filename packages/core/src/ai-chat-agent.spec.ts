@@ -1,6 +1,5 @@
-import { CalculatorTool } from "../../tools/src/calculator.tool";
 import { AiChatAgent } from "./ai-chat-agent";
-import { ILogger } from "./logger";
+import { BaseTool } from "./base-tool";
 import {
   ChatAgentGetResponseInput,
   ChatAgentGetResponseOutput,
@@ -8,7 +7,29 @@ import {
   ChatMessage,
   MessageAssistant,
 } from "./types";
-import { mock } from "jest-mock-extended";
+import { z } from "zod";
+
+class CalculatorTool extends BaseTool {
+  public name = "CalculatorTool";
+  public description =
+    "Call this tool to perform any basic math. The input to this tool should be a valid mathematical expression that could be executed by a simple calculator. Only provide constants and operators";
+  public schema = z.object({
+    expr: z
+      .string()
+      .describe("A valid mathematical expression. Do not use variables."),
+  });
+  public handler({ expr }: z.TypeOf<typeof this.schema>): string {
+    expr = expr.replaceAll(/[^0-9+\-*/\s]/, "");
+    try {
+      const ans = eval(expr).toString();
+      return `${expr} = ${ans}`;
+    } catch (e) {
+      throw new Error(
+        "Invalid expression. Only provide numbers and operators without variables. You may try again",
+      );
+    }
+  }
+}
 
 class MockExecutor implements ChatExecutor {
   modelId = "mock-model-id";
@@ -59,13 +80,12 @@ describe("AiChatAgent", () => {
     chatExecutor = new MockExecutor();
     agent = new AiChatAgent({
       chatExecutor,
-      logger: mock<ILogger>(),
     });
   });
   describe("getResponse", () => {
     it("should return a response message", async () => {
       const response = await agent.getResponse({
-        context: {},
+        meta: {},
         messages: [{ role: "user", content: "Hey buddy" }],
         tools: [new CalculatorTool()],
       });
@@ -75,7 +95,7 @@ describe("AiChatAgent", () => {
     });
     it("should call a tool and return the response, along with intermediate steps including tool calls", async () => {
       const response = await agent.getResponse({
-        context: {},
+        meta: {},
         messages: [{ role: "user", content: "Calculate 3 + 4" }],
         tools: [new CalculatorTool()],
       });

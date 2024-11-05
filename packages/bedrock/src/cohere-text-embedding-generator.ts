@@ -3,7 +3,7 @@ import {
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
-} from "../../core/src";
+} from "@ifit/charlie-core";
 
 interface CohereTextEmbeddingRequest {
   texts: string[];

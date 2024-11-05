@@ -1,17 +1,24 @@
 /* eslint-disable no-console */
 import repl from "node:repl";
-import { AiChatAgent } from "../../core/src/ai-chat-agent";
-import { ChatAgent, ChatMessage, MessageUser } from "../../core/src/types";
-import { CountLettersTool } from "../../tools/letter-count.tool";
-import { CurrentTimeTool } from "../../tools/current-time.tool";
-import { OpenAiChatExecutor } from "../../openai/openai-chat-executor";
+import {
+  AiChatAgent,
+  ChatAgent,
+  ChatMessage,
+  MessageUser,
+  ToolAssistantFilter,
+  EventName,
+  events,
+} from "@ifit/charlie-core";
+import { OpenAiChatExecutor } from "@ifit/charlie-openai";
+import {
+  BedrockChatExecutor,
+  InlineToolCallParser,
+} from "@ifit/charlie-bedrock";
+import { GeminiExecutor } from "@ifit/charlie-google";
+import { CountLettersTool } from "../tools/letter-count.tool";
+import { CurrentTimeTool } from "../tools/current-time.tool";
 import { setTimeout as sleep } from "timers/promises";
-import { CalculatorTool } from "../../tools/calculator.tool";
-import { BedrockChatExecutor } from "../../bedrock/src/bedrock-chat-executor";
-import { InlineToolCallParser } from "../../bedrock/src/inline-tool-call-parser";
-import { ToolAssistantFilter } from "../../core/src/tool-assistant-filter";
-import { EventName, events } from "../../core/src";
-import { GeminiExecutor } from "../../google/gemini-executor";
+import { CalculatorTool } from "../tools/calculator.tool";
 
 events.on(EventName.ChatRawRequest, (data) => {
   console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));

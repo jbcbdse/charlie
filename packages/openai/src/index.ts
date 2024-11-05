@@ -1,1 +1,1 @@
-export { OpenAiChatExecutor as OpenAiChatAgent } from "./openai-chat-executor";
+export { OpenAiChatExecutor } from "./openai-chat-executor";

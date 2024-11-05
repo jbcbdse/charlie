@@ -5,14 +5,12 @@ import {
   ChatAgentGetResponseOutput,
   ChatMessage,
   ChatExecutorInput,
-} from "../../core/src/types";
-import { ILogger } from "../core/logger";
-import { TemplateSerializer } from "../../core/src/template-serializer";
-import {
+  ILogger,
+  TemplateSerializer,
   EventName,
   eventProducer,
   EventProducer,
-} from "../../core/src/event-producer";
+} from "@ifit/charlie-core";
 import zodToJsonSchema from "zod-to-json-schema";
 
 export class OpenAiChatExecutor implements ChatExecutor {

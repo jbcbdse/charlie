@@ -3,7 +3,7 @@ import {
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
-} from "../../core/src/types";
+} from "@ifit/charlie-core";
 
 export interface OpenAiTextEmbeddingGeneratorOptions {
   apiKey: string;

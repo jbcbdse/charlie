@@ -9,6 +9,7 @@ export {
   ChatAgentGetResponseInput,
   ChatAgentGetResponseOutput,
   ChatExecutor,
+  ChatExecutorInput,
   ChatMessage,
   ChatMessageTransformer,
   MessageAssistant,
@@ -21,4 +22,10 @@ export {
   TextEmbeddingOutput,
 } from "./types";
 export { events } from "./event-subscriber";
-export { EventName, EventTypeMap } from "./event-producer";
+export {
+  EventName,
+  EventTypeMap,
+  eventProducer,
+  EventProducer,
+} from "./event-producer";
+export { ILogger, Logger } from "./logger";

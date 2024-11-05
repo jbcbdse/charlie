@@ -47,7 +47,7 @@ Tools are asynchronous functions that take a structured input and return a strin
 
 ```ts
 import { z } from "zod";
-import { BaseTool } from "../../core/base-tool";
+import { BaseTool } from "@ifit/charlie-core";
 
 export class CountLettersTool extends BaseTool {
   public name = CountLettersTool.name;

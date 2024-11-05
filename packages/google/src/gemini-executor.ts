@@ -1,9 +1,10 @@
-import { ChatExecutor } from "../../core/src";
 import {
-  ChatAgentGetResponseOutput,
+  ChatExecutor,
   ChatExecutorInput,
-  ChatMessage,
-} from "../../core/src/types";
+  EventName,
+  eventProducer,
+  ChatAgentGetResponseOutput,
+} from "@ifit/charlie-core";
 import {
   GenerateContentRequest,
   GenerativeModel,
@@ -11,7 +12,6 @@ import {
 } from "@google/generative-ai";
 import { ToolConverter } from "./tool-converter";
 import { MessageConverter } from "./message-converter";
-import { EventName, eventProducer } from "../../core/src/event-producer";
 
 export class GeminiExecutor implements ChatExecutor {
   public modelId: string;
