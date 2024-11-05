@@ -6,6 +6,7 @@ import eslintPrettierPluginRecommended from "eslint-plugin-prettier/recommended"
 
 export default tseslint.config(
   eslint.configs.recommended,
+  // the red squiggle doesn't appear to have any effect
   eslintPrettierPluginRecommended,
   ...tseslint.configs.strict,
   ...tseslint.configs.stylistic,

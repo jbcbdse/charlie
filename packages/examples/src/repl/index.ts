@@ -1,25 +1,25 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 /* eslint-disable no-console */
-import repl from "node:repl";
 import {
   AiChatAgent,
   ChatAgent,
   ChatMessage,
+  EventName,
   MessageUser,
   ToolAssistantFilter,
-  EventName,
   events,
 } from "@ifit/charlie-core";
-import { OpenAiChatExecutor } from "@ifit/charlie-openai";
 import {
   BedrockChatExecutor,
   InlineToolCallParser,
 } from "@ifit/charlie-bedrock";
-import { GeminiExecutor } from "@ifit/charlie-google";
+import { CalculatorTool } from "../tools/calculator.tool";
 import { CountLettersTool } from "../tools/letter-count.tool";
 import { CurrentTimeTool } from "../tools/current-time.tool";
+import { GeminiExecutor } from "@ifit/charlie-google";
+import { OpenAiChatExecutor } from "@ifit/charlie-openai";
+import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
-import { CalculatorTool } from "../tools/calculator.tool";
 
 events.on(EventName.ChatRawRequest, (data) => {
   console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
