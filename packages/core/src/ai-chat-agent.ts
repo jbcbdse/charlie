@@ -47,9 +47,6 @@ export class AiChatAgent implements ChatAgent {
     tools,
     meta = {},
   }: ChatAgentGetResponseInput): Promise<ChatAgentGetResponseOutput> {
-    const systemPrompt = this.systemPromptTemplate
-      ? this.templateSerializer.serialize(this.systemPromptTemplate, meta)
-      : undefined;
     let doLoop = true;
     let responseMessages: ChatAgentGetResponseOutput["responseMessages"] = [];
     const context: ChatAgentContext = {
@@ -61,18 +58,26 @@ export class AiChatAgent implements ChatAgent {
     context.runId = newRunId();
     context.modelId = this.chatExecutor.modelId;
     context.messages = messages;
+    let started = false;
     const chatStartMs = Date.now();
-    this.eventProducer.emit(EventName.ChatStart, {
-      context,
-      messages,
-      systemPrompt,
-      modelId: this.chatExecutor.modelId,
-    });
     do {
+      const systemPrompt = this.systemPromptTemplate
+        ? this.templateSerializer.serialize(this.systemPromptTemplate, meta)
+        : undefined;
+      if (!started) {
+        this.eventProducer.emit(EventName.ChatStart, {
+          context,
+          messages,
+          systemPrompt,
+          modelId: this.chatExecutor.modelId,
+        });
+        started = true;
+      }
       const chatExecutorStartMs = Date.now();
       this.eventProducer.emit(EventName.ChatExecutorStart, {
         context,
         messages,
+        systemPrompt,
         modelId: this.chatExecutor.modelId,
       });
       const response = await this.chatExecutor.execute({
@@ -83,7 +88,10 @@ export class AiChatAgent implements ChatAgent {
       });
       let newResponseMessages = response.responseMessages;
       for (const transformer of this.preToolCallTransformers) {
-        newResponseMessages = await transformer.transform(newResponseMessages);
+        newResponseMessages = await transformer.transform(
+          newResponseMessages,
+          context,
+        );
       }
       responseMessages.push(...newResponseMessages);
       this.eventProducer.emit(EventName.ChatExecutorEnd, {
@@ -104,26 +112,26 @@ export class AiChatAgent implements ChatAgent {
         responseMessages.push(...toolResponses);
         let newMessages = [...newResponseMessages, ...toolResponses];
         for (const transformer of this.postToolCallTransformers) {
-          newMessages = await transformer.transform(newMessages);
+          newMessages = await transformer.transform(newMessages, context);
         }
         messages = [...messages, ...newMessages];
       } else {
         doLoop = false;
+        this.eventProducer.emit(EventName.ChatEnd, {
+          context,
+          messages: response.responseMessages,
+          modelId: this.chatExecutor.modelId,
+          timeMs: Date.now() - chatStartMs,
+        });
       }
     } while (doLoop);
     for (const transformer of this.postRunTransformers) {
-      responseMessages = await transformer.transform(responseMessages);
+      responseMessages = await transformer.transform(responseMessages, context);
     }
     const response = {
       responseMessage: responseMessages[responseMessages.length - 1],
       responseMessages,
     };
-    this.eventProducer.emit(EventName.ChatEnd, {
-      context,
-      messages: response.responseMessages,
-      modelId: this.chatExecutor.modelId,
-      timeMs: Date.now() - chatStartMs,
-    });
     return response;
   }
 

@@ -77,7 +77,10 @@ export interface MessageTool {
  * This is useful as a process messages before or after tool calls
  */
 export interface ChatMessageTransformer {
-  transform(messages: ChatMessage[]): ChatMessage[] | Promise<ChatMessage[]>;
+  transform(
+    messages: ChatMessage[],
+    context: ChatAgentContext,
+  ): ChatMessage[] | Promise<ChatMessage[]>;
 }
 
 /**

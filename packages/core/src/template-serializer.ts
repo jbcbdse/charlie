@@ -8,7 +8,10 @@ export class TemplateSerializer {
     }
     [...matches].forEach((match) => {
       const [fullMatch, key] = match;
-      const value = stringify(_get(params, key) ?? "");
+      let value = _get(params, key) ?? "";
+      if (typeof value !== "string") {
+        value = stringify(value);
+      }
       template = template.replaceAll(fullMatch, value);
     });
     return template;
