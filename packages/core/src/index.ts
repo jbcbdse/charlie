@@ -28,4 +28,3 @@ export {
   eventProducer,
   EventProducer,
 } from "./event-producer";
-export { ILogger, Logger } from "./logger";

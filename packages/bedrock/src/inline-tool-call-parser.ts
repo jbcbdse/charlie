@@ -5,15 +5,10 @@ import {
   MessageAssistant,
   MessageToolCall,
 } from "@ifit/charlie-core";
-import { ILogger, Logger } from "@ifit/charlie-core";
 /**
  * Some models do not produce tool call objects in the response, but instead include the tool call as a string in the response text. This class attempts to parse the tool call from the response text.
  */
 export class InlineToolCallParser implements ChatMessageTransformer {
-  private logger: ILogger;
-  constructor(options: { logger?: ILogger } = {}) {
-    this.logger = options.logger || new Logger();
-  }
   transform(messages: ChatMessage[]): ChatMessage[] {
     return messages.map((msg) => {
       return msg.role === "assistant"
@@ -42,9 +37,6 @@ export class InlineToolCallParser implements ChatMessageTransformer {
       return null;
     }
     try {
-      this.logger.debug("Parsing inline function from response text", {
-        text,
-      });
       interface ExpectedToolCall {
         name: string;
         arguments: unknown;
@@ -72,9 +64,6 @@ export class InlineToolCallParser implements ChatMessageTransformer {
           .flat(),
       };
     } catch (e) {
-      this.logger.error("Error parsing inline function: " + String(e), {
-        error: e,
-      });
       return null;
     }
   }

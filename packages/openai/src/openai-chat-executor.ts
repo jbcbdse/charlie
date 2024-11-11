@@ -5,7 +5,6 @@ import {
   ChatAgentGetResponseOutput,
   ChatMessage,
   ChatExecutorInput,
-  ILogger,
   TemplateSerializer,
   EventName,
   eventProducer,
@@ -21,7 +20,6 @@ export class OpenAiChatExecutor implements ChatExecutor {
   constructor(
     private options: {
       modelId: string;
-      logger?: ILogger;
       systemPromptTemplate?: string;
       promptSerializer?: TemplateSerializer;
       apiKey: string;

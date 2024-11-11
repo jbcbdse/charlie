@@ -9,8 +9,6 @@ import {
   ChatAgentGetResponseOutput,
   ChatMessage,
   ChatExecutorInput,
-  ILogger,
-  Logger,
   EventName,
   eventProducer,
   EventProducer,
@@ -24,7 +22,6 @@ export class BedrockChatExecutor implements ChatExecutor {
   public modelId: string;
   private toolPromptGenerator: ToolPromptGenerator;
   private messageConverter: MessageConverter;
-  private logger: ILogger;
   private eventProducer: EventProducer;
   constructor(options: {
     client?: BedrockRuntime;
@@ -33,12 +30,10 @@ export class BedrockChatExecutor implements ChatExecutor {
     toolPromptGenerator?: ToolPromptGenerator;
     messageConverter?: MessageConverter;
     eventProducer?: EventProducer;
-    logger?: ILogger;
   }) {
     this.client = options.client || new BedrockRuntime({});
     this.modelId = options.modelId;
-    this.logger = options.logger || new Logger();
-    options.toolParser || new InlineToolCallParser({ logger: this.logger });
+    options.toolParser || new InlineToolCallParser();
     this.toolPromptGenerator =
       options.toolPromptGenerator || new ToolPromptGenerator();
     this.messageConverter =
