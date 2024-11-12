@@ -21,7 +21,7 @@ export {
   TextEmbeddingInput,
   TextEmbeddingOutput,
 } from "./types";
-export { events } from "./event-subscriber";
+export { events, EventSubscriber } from "./event-subscriber";
 export {
   EventName,
   EventTypeMap,
