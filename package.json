@@ -6,6 +6,10 @@
   "workspaces": [
     "packages/*"
   ],
+  "files": [
+    "packages",
+    "package.json"
+  ],
   "scripts": {
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",

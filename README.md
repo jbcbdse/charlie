@@ -4,7 +4,30 @@ Charlie is a TypeScript framework for executing different AI models with a unifi
 
 Charlie is the handler of many agents.
 
+## Installation
+
+Install core:
+
+```
+npm install @ifit/charlie-core
+```
+
+Install vendor-specific packages:
+
+```
+# for openai (gpt)
+npm install @ifit/charlie-openai
+# for bedrock
+npm install @ifit/charlie-bedrock
+# for google (gemini)
+npm install @ifit/charlie-google
+```
+
 ## Features
+
+The best way to see the implementation is to look at the `examples` package, which has a terminal REPL for chat.
+
+Charlie's mission (if you choose to accept it) is to be a simpler, flexible utility to interact with chat LLMs. Charlie also comes with executors for text embeddings, with more use cases to be added in the future.
 
 ### Chat Agent
 
