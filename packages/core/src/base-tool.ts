@@ -3,14 +3,20 @@ import { z } from "zod";
 import zodToJsonSchema from "zod-to-json-schema";
 import { ChatAgentContext } from "./types";
 
-interface ITool {
+/**
+ * All tools must confirm to this interface
+ */
+export interface ITool {
   name: string;
   description: string;
+  /**
+   * JSON schema for the parameters of the tool
+   */
   readonly jsonSchema: any;
   handle(params: any, context: ChatAgentContext): Promise<string>;
 }
 /**
- * All user-defined tools should extend this class
+ * User-defined tools can extend this class to automatically validate with a zod schema
  */
 export abstract class BaseTool implements ITool {
   public abstract name: string;

@@ -11,7 +11,7 @@ import {
 import { ToolExecutor } from "./tool-executor";
 import { EventName, eventProducer, EventProducer } from "./event-producer";
 import { newRunId } from "./new-run-id";
-import { BaseTool } from "./base-tool";
+import { ITool } from "./base-tool";
 import { TemplateSerializer } from "./template-serializer";
 
 export class AiChatAgent implements ChatAgent {
@@ -137,7 +137,7 @@ export class AiChatAgent implements ChatAgent {
 
   private async executeToolCalls(
     toolCalls: MessageToolCall[],
-    tools: BaseTool[],
+    tools: ITool[],
     context: ChatAgentContext,
   ): Promise<MessageTool[]> {
     const toolStartMs = Date.now();

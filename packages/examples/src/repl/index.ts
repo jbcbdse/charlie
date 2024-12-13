@@ -5,6 +5,8 @@ import {
   ChatAgent,
   ChatMessage,
   EventName,
+  MessageTool,
+  MessageToolCall,
   MessageUser,
   ToolAssistantFilter,
   events,
@@ -21,12 +23,17 @@ import { OpenAiChatExecutor } from "@ifit/charlie-openai";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
 
-events.on(EventName.ChatRawRequest, (data) => {
-  console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
+events.on(EventName.ToolStart, (data) => {
+  // console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
+  console.log((data.toolCall as MessageToolCall).toolCalls);
 });
-events.on(EventName.ChatRawResponse, (data) => {
-  console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
+events.on(EventName.ToolEnd, (data) => {
+  // console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
+  console.log(`[Tool result] ${(data.toolMessage as MessageTool).content}`);
 });
+// events.on(EventName.ChatRawResponse, (data) => {
+//   // console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
+// });
 const promptTemplate = [
   "You are a helpful but rude, sarcastic assistant, but keep it PG-13. Use 1 emoji in every response",
   "",

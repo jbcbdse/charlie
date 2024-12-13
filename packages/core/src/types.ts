@@ -6,7 +6,7 @@ They are designed to be flexible enough to use with any modern LLM, while not ev
 These types should be suitable for storing history with a clear idea of what happened during chat. This format allows you to see the tool calls inline with the rest of the chat history, even if you generally exclude those messages from subsequent inference calls.
 */
 
-import type { BaseTool } from "./base-tool";
+import type { ITool } from "./base-tool";
 
 /**
  * A system message in the chat
@@ -106,7 +106,7 @@ export interface ChatAgentContext {
 }
 export interface ChatAgentGetResponseInput {
   messages: ChatMessage[];
-  tools?: BaseTool[];
+  tools?: ITool[];
   systemPrompt?: string;
   meta?: ChatAgentContentMeta;
 }
@@ -121,7 +121,7 @@ export interface ChatAgent {
 }
 export interface ChatExecutorInput {
   messages: ChatMessage[];
-  tools?: BaseTool[];
+  tools?: ITool[];
   systemPrompt?: string;
   context: ChatAgentContext;
 }

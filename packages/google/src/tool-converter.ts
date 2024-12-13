@@ -1,9 +1,9 @@
 import toOpenApi from "@openapi-contrib/json-schema-to-openapi-schema";
-import { BaseTool } from "@ifit/charlie-core";
+import { ITool } from "@ifit/charlie-core";
 import { FunctionDeclaration, Tool } from "@google/generative-ai";
 
 export class ToolConverter {
-  public async toGeminiTools(tools: BaseTool[]): Promise<Tool[]> {
+  public async toGeminiTools(tools: ITool[]): Promise<Tool[]> {
     const geminiTools = [
       {
         functionDeclarations: await Promise.all(
@@ -14,7 +14,7 @@ export class ToolConverter {
     return geminiTools;
   }
   private async toFunctionDeclaration(
-    tool: BaseTool,
+    tool: ITool,
   ): Promise<FunctionDeclaration> {
     type ReturnedSchema = Required<
       Required<Awaited<ReturnType<typeof toOpenApi>>>["components"]
