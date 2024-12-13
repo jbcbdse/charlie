@@ -5,8 +5,6 @@ import {
   ChatAgent,
   ChatMessage,
   EventName,
-  MessageTool,
-  MessageToolCall,
   MessageUser,
   ToolAssistantFilter,
   events,
@@ -25,13 +23,11 @@ import { setTimeout as sleep } from "timers/promises";
 
 events.on(EventName.ToolStart, (data) => {
   // console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
-  console.dir((data.toolCall as MessageToolCall).toolCalls, { depth: null });
+  console.dir(data.toolCall.toolCalls, { depth: null });
 });
 events.on(EventName.ToolsEnd, (data) => {
   data.toolMessages.forEach((toolMessage, index) => {
-    console.log(
-      `[Tool result ${index + 1}] ${(toolMessage as MessageTool).content}`,
-    );
+    console.log(`[Tool result ${index + 1}] ${toolMessage.content}`);
   });
 });
 events.on(EventName.ChatEnd, (data) => {
