@@ -18,14 +18,28 @@ import { ToolPromptGenerator } from "./tool-prompt-generator";
 import { MessageConverter } from "./message-converter";
 
 export class BedrockChatExecutor implements ChatExecutor {
-  private client: BedrockRuntime;
   public modelId: string;
+  private client: BedrockRuntime;
   private toolPromptGenerator: ToolPromptGenerator;
   private messageConverter: MessageConverter;
   private eventProducer: EventProducer;
+  private toolsSupported: boolean;
+
   constructor(options: {
     client?: BedrockRuntime;
     modelId: string;
+    /**
+     * Whether the model supports tool calling
+     *
+     * If true (default), then tools will be sent via the Converse API
+     * If false, then tool descriptions will be added to the system prompt (old school style)
+     * and we assume that tool calls will never be returned from the Converse API as such, but may be embedded as plain text in the assistant message responses
+     * Tool calls can then be parsed with a trasnformer such as the InlienToolCallParser.
+     * You must provide this transformer to the agent
+     *
+     * You _may_ use the InlineToolCallParser to parse tool calls even if tool calls are supported. For example, Mistral is flaky and it may help.
+     */
+    toolsSupported?: boolean;
     toolParser?: InlineToolCallParser;
     toolPromptGenerator?: ToolPromptGenerator;
     messageConverter?: MessageConverter;
@@ -33,16 +47,18 @@ export class BedrockChatExecutor implements ChatExecutor {
   }) {
     this.client = options.client || new BedrockRuntime({});
     this.modelId = options.modelId;
+    this.toolsSupported = options.toolsSupported ?? true;
     options.toolParser || new InlineToolCallParser();
     this.toolPromptGenerator =
       options.toolPromptGenerator || new ToolPromptGenerator();
     this.messageConverter =
       options.messageConverter ||
       new MessageConverter({
-        toolsSupported: this.toolsSupported(this.modelId),
+        toolsSupported: this.toolsSupported,
       });
     this.eventProducer = options.eventProducer || eventProducer;
   }
+
   public async execute({
     messages,
     tools,
@@ -51,7 +67,7 @@ export class BedrockChatExecutor implements ChatExecutor {
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const [systemPrompts, remainingMessages] =
       this.extractLeadingSystemMessages(messages);
-    if (tools && !this.toolsSupported(this.modelId)) {
+    if (tools && !this.toolsSupported) {
       systemPrompts.push(this.toolPromptGenerator.generateToolPrompt(tools));
     }
     if (systemPrompt) {
@@ -80,7 +96,7 @@ export class BedrockChatExecutor implements ChatExecutor {
         ? systemPrompts.map((prompt) => ({ text: prompt }))
         : undefined,
       toolConfig:
-        tools && tools.length > 0 && this.toolsSupported(this.modelId)
+        tools && tools.length > 0 && this.toolsSupported
           ? {
               tools:
                 tools &&
@@ -168,16 +184,6 @@ export class BedrockChatExecutor implements ChatExecutor {
     return response;
   }
 
-  /**
-   * Whether the toolConfig arg to the Converse API is supported by the model
-   */
-  private toolsSupported(modelId: string): boolean {
-    // this is not exhaustive,
-    // this might need to be filled in later
-    return !(
-      modelId.startsWith("meta.llama3") || modelId.startsWith("amazon.titan")
-    );
-  }
   /** Whether the `system` arg to the Converse API is supported by the model */
   private systemMessagesSupported(modelId: string): boolean {
     // this is not exhaustive,
