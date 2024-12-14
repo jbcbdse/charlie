@@ -17,7 +17,7 @@ import { CalculatorTool } from "../tools/calculator.tool";
 import { CountLettersTool } from "../tools/letter-count.tool";
 import { CurrentTimeTool } from "../tools/current-time.tool";
 import { GeminiExecutor } from "@ifit/charlie-google";
-import { OpenAiChatExecutor } from "@ifit/charlie-openai";
+import { GrokExecutor, OpenAiChatExecutor } from "@ifit/charlie-openai";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
 
@@ -44,6 +44,7 @@ type AvailableAgent =
   | "llama3"
   | "titan"
   | "gpt4o"
+  | "grok"
   | "gemini";
 const agents: Record<AvailableAgent, ChatAgent> = {
   claude: new AiChatAgent({
@@ -86,6 +87,13 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     chatExecutor: new OpenAiChatExecutor({
       modelId: "gpt-4o",
       apiKey: process.env.OPENAI_API_KEY!,
+    }),
+    systemPromptTemplate: promptTemplate,
+  }),
+  grok: new AiChatAgent({
+    chatExecutor: new GrokExecutor({
+      modelId: "grok-beta",
+      apiKey: process.env.XAI_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
   }),

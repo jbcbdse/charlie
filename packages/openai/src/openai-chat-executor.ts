@@ -12,25 +12,28 @@ import {
 } from "@ifit/charlie-core";
 import zodToJsonSchema from "zod-to-json-schema";
 
+export interface OpenAiChatExecutorOptions {
+  modelId: string;
+  systemPromptTemplate?: string;
+  promptSerializer?: TemplateSerializer;
+  apiKey: string;
+  axoisInstance?: AxiosInstance;
+  eventProducer?: EventProducer;
+}
 export class OpenAiChatExecutor implements ChatExecutor {
   private apiKey: string;
   private axios: AxiosInstance;
   private eventProducer: EventProducer;
   public modelId: string;
-  constructor(
-    private options: {
-      modelId: string;
-      systemPromptTemplate?: string;
-      promptSerializer?: TemplateSerializer;
-      apiKey: string;
-      axoisInstance?: AxiosInstance;
-      eventProducer?: EventProducer;
-    },
-  ) {
+  constructor(private options: OpenAiChatExecutorOptions) {
     this.options.modelId ??= "gpt-4o";
     this.modelId = this.options.modelId;
     this.apiKey = options.apiKey;
-    this.axios = options.axoisInstance ?? axios.create();
+    this.axios =
+      options.axoisInstance ??
+      axios.create({
+        baseURL: "https://api.openai.com/v1/",
+      });
     this.eventProducer = options.eventProducer ?? eventProducer;
   }
   public async execute({
@@ -66,15 +69,11 @@ export class OpenAiChatExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const response = await this.axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      request,
-      {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
+    const response = await this.axios.post("chat/completions", request, {
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
       },
-    );
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data: any = await response.data;
     this.eventProducer.emit(EventName.ChatRawResponse, {
