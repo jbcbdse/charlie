@@ -10,7 +10,6 @@ import {
   eventProducer,
   EventProducer,
 } from "@ifit/charlie-core";
-import zodToJsonSchema from "zod-to-json-schema";
 
 export interface OpenAiChatExecutorOptions {
   modelId: string;
@@ -59,7 +58,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
           function: {
             name: tool.name,
             description: tool.description,
-            parameters: zodToJsonSchema(tool.schema),
+            parameters: tool.jsonSchema,
           },
         })),
     };

@@ -1,5 +1,10 @@
 import EventEmitter from "events";
-import { ChatAgentContext, ChatMessage } from "./types";
+import {
+  ChatAgentContext,
+  ChatMessage,
+  MessageTool,
+  MessageToolCall,
+} from "./types";
 
 interface ChatEvent {
   context: ChatAgentContext;
@@ -21,17 +26,17 @@ export interface EventChatEnd extends ChatEndEvent {
   messages: ChatMessage[];
 }
 export interface EventToolsStart extends ChatEvent {
-  toolCalls: ChatMessage[];
+  toolCalls: MessageToolCall[];
 }
 export interface EventToolsEnd extends ChatEndEvent {
-  toolMessages: ChatMessage[];
+  toolMessages: MessageTool[];
 }
 export interface EventToolStart extends ChatEvent {
-  toolCall: ChatMessage;
+  toolCall: MessageToolCall;
   toolCallId: string;
 }
 export interface EventToolEnd extends ChatEndEvent {
-  toolMessage: ChatMessage;
+  toolMessage: MessageTool;
 }
 export interface EventChatExecutorStart extends ChatEvent {
   modelId: string;

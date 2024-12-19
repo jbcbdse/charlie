@@ -1,4 +1,4 @@
-export { BaseTool } from "./base-tool";
+export { ITool, BaseTool } from "./base-tool";
 export { AiChatAgent } from "./ai-chat-agent";
 export { TemplateSerializer } from "./template-serializer";
 export { ToolAssistantFilter } from "./tool-assistant-filter";

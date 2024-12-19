@@ -1,4 +1,4 @@
-import { BaseTool } from "./base-tool";
+import { ITool } from "./base-tool";
 import { EventName, eventProducer, EventProducer } from "./event-producer";
 import { ChatAgentContext, MessageTool, MessageToolCall } from "./types";
 
@@ -15,7 +15,7 @@ export class ToolExecutor {
    */
   public async execute(
     toolCallMessage: MessageToolCall,
-    tools: BaseTool[],
+    tools: ITool[],
     context: ChatAgentContext,
   ): Promise<MessageTool[]> {
     const toolMessages = await Promise.all(

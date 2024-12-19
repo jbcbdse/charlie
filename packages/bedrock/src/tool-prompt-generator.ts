@@ -1,10 +1,10 @@
-import { BaseTool } from "@ifit/charlie-core";
+import { ITool } from "@ifit/charlie-core";
 
 export class ToolPromptGenerator {
   /**
    * This should be used when for Bedrock models that do not support tool calls
    */
-  public generateToolPrompt(tools: BaseTool[]): string {
+  public generateToolPrompt(tools: ITool[]): string {
     return [
       "You have the following tools available to help answer the user's request. You can call a one or more functions at a time. The functions are described here in JSON-schema format",
       "",
