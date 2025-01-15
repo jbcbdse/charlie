@@ -1,6 +1,6 @@
 {
   "name": "@ifit/charlie-examples",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -11,10 +11,10 @@
   "author": "iFIT",
   "license": "MIT",
   "dependencies": {
-    "@ifit/charlie-bedrock": "^0.0.1",
-    "@ifit/charlie-openai": "^0.0.1",
-    "@ifit/charlie-google": "^0.0.1",
-    "@ifit/charlie-core": "^0.0.1",
+    "@ifit/charlie-bedrock": "^0.1.0",
+    "@ifit/charlie-openai": "^0.1.0",
+    "@ifit/charlie-google": "^0.1.0",
+    "@ifit/charlie-core": "^0.1.0",
     "expr-eval": "^2.0.2",
     "zod": "^3.23.8"
   }
