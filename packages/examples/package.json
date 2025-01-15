@@ -1,7 +1,8 @@
 {
-  "name": "@ifit/charlie-examples",
+  "name": "@jbcbdse/charlie-examples",
   "version": "0.1.0",
   "description": "",
+  "repository": "https://github.com/jbcbdse/charlie",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc -p ./tsconfig.json",
@@ -11,10 +12,10 @@
   "author": "iFIT",
   "license": "MIT",
   "dependencies": {
-    "@ifit/charlie-bedrock": "^0.1.0",
-    "@ifit/charlie-openai": "^0.1.0",
-    "@ifit/charlie-google": "^0.1.0",
-    "@ifit/charlie-core": "^0.1.0",
+    "@jbcbdse/charlie-bedrock": "^0.1.0",
+    "@jbcbdse/charlie-openai": "^0.1.0",
+    "@jbcbdse/charlie-google": "^0.1.0",
+    "@jbcbdse/charlie-core": "^0.1.0",
     "expr-eval": "^2.0.2",
     "zod": "^3.23.8"
   }

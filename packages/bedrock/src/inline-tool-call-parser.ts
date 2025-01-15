@@ -4,7 +4,7 @@ import {
   ChatMessageTransformer,
   MessageAssistant,
   MessageToolCall,
-} from "@ifit/charlie-core";
+} from "@jbcbdse/charlie-core";
 /**
  * Some models do not produce tool call objects in the response, but instead include the tool call as a string in the response text. This class attempts to parse the tool call from the response text.
  */

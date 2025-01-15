@@ -12,7 +12,7 @@ import {
   EventName,
   eventProducer,
   EventProducer,
-} from "@ifit/charlie-core";
+} from "@jbcbdse/charlie-core";
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
 import { MessageConverter } from "./message-converter";

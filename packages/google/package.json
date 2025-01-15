@@ -1,7 +1,8 @@
 {
-  "name": "@ifit/charlie-google",
+  "name": "@jbcbdse/charlie-google",
   "version": "0.1.0",
   "description": "",
+  "repository": "https://github.com/jbcbdse/charlie",
   "main": "dist/index.js",
   "exports": {
     ".": {
@@ -22,7 +23,7 @@
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.19.0",
-    "@ifit/charlie-core": "^0.1.0",
+    "@jbcbdse/charlie-core": "^0.1.0",
     "@openapi-contrib/json-schema-to-openapi-schema": "^3.0.2"
   }
 }

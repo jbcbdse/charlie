@@ -1,7 +1,8 @@
 {
-  "name": "@ifit/charlie-openai",
+  "name": "@jbcbdse/charlie-openai",
   "version": "0.1.0",
   "description": "",
+  "repository": "https://github.com/jbcbdse/charlie",
   "main": "dist/index.js",
   "exports": {
     ".": {
@@ -21,7 +22,7 @@
   "author": "iFIT",
   "license": "MIT",
   "dependencies": {
-    "@ifit/charlie-core": "^0.1.0",
+    "@jbcbdse/charlie-core": "^0.1.0",
     "axios": "^1.7.7",
     "zod-to-json-schema": "^3.23.2"
   }

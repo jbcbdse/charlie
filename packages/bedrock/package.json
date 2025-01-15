@@ -1,7 +1,8 @@
 {
-  "name": "@ifit/charlie-bedrock",
+  "name": "@jbcbdse/charlie-bedrock",
   "version": "0.1.0",
   "description": "",
+  "repository": "https://github.com/jbcbdse/charlie",
   "main": "dist/index.js",
   "exports": {
     ".": {
@@ -22,7 +23,7 @@
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.623.0",
-    "@ifit/charlie-core": "^0.1.0",
+    "@jbcbdse/charlie-core": "^0.1.0",
     "uuid": "^10.0.0"
   }
 }

@@ -8,16 +8,16 @@ import {
   MessageUser,
   ToolAssistantFilter,
   events,
-} from "@ifit/charlie-core";
+} from "@jbcbdse/charlie-core";
 import {
   BedrockChatExecutor,
   InlineToolCallParser,
-} from "@ifit/charlie-bedrock";
+} from "@jbcbdse/charlie-bedrock";
 import { CalculatorTool } from "../tools/calculator.tool";
 import { CountLettersTool } from "../tools/letter-count.tool";
 import { CurrentTimeTool } from "../tools/current-time.tool";
-import { GeminiExecutor } from "@ifit/charlie-google";
-import { GrokExecutor, OpenAiChatExecutor } from "@ifit/charlie-openai";
+import { GeminiExecutor } from "@jbcbdse/charlie-google";
+import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
 
