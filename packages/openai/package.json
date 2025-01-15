@@ -2,7 +2,10 @@
   "name": "@jbcbdse/charlie-openai",
   "version": "0.1.0",
   "description": "",
-  "repository": "https://github.com/jbcbdse/charlie",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbcbdse/charlie.git"
+  },
   "main": "dist/index.js",
   "exports": {
     ".": {

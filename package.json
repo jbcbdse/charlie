@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "",
   "private": true,
-  "repository": "https://github.com/jbcbdse/charlie",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbcbdse/charlie.git"
+  },
   "workspaces": [
     "packages/*"
   ],
