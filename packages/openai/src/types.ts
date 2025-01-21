@@ -11,7 +11,7 @@ interface OpenAiUserMessage {
 }
 interface OpenAiAssistantMessage {
   role: "assistant";
-  content: string;
+  content: string | null;
   name?: string;
   tool_calls?: OpenAiAssistantToolCall[];
 }

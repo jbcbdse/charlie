@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import {
   BedrockRuntime,
+  BedrockRuntimeClientConfig,
   ConverseCommandInput,
   Message,
 } from "@aws-sdk/client-bedrock-runtime";
@@ -16,7 +17,8 @@ import {
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
 import { MessageConverter } from "./message-converter";
-
+export type BedrockClientCredentials =
+  BedrockRuntimeClientConfig["credentials"];
 export class BedrockChatExecutor implements ChatExecutor {
   public modelId: string;
   private client: BedrockRuntime;
@@ -27,6 +29,7 @@ export class BedrockChatExecutor implements ChatExecutor {
 
   constructor(options: {
     client?: BedrockRuntime;
+    credentials?: BedrockClientCredentials;
     modelId: string;
     /**
      * Whether the model supports tool calling
@@ -45,7 +48,11 @@ export class BedrockChatExecutor implements ChatExecutor {
     messageConverter?: MessageConverter;
     eventProducer?: EventProducer;
   }) {
-    this.client = options.client || new BedrockRuntime({});
+    this.client =
+      options.client ||
+      new BedrockRuntime({
+        credentials: options.credentials,
+      });
     this.modelId = options.modelId;
     this.toolsSupported = options.toolsSupported ?? true;
     options.toolParser || new InlineToolCallParser();
