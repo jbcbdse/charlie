@@ -1,6 +1,6 @@
 {
   "name": "@ifit/charlie-openai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "",
   "main": "dist/index.js",
   "exports": {
@@ -21,7 +21,7 @@
   "author": "iFIT",
   "license": "MIT",
   "dependencies": {
-    "@ifit/charlie-core": "^0.1.0",
+    "@ifit/charlie-core": "^0.1.1",
     "openai": "^4.79.1",
     "zod-to-json-schema": "^3.23.2"
   }
