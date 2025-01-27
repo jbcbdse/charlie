@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from "axios";
+import OpenAI from "openai";
 import { OpenAiChatMessage, OpenAiCompletionsRequest } from "./types";
 import {
   ChatExecutor,
@@ -13,25 +13,26 @@ import {
 
 export interface OpenAiChatExecutorOptions {
   modelId: string;
-  systemPromptTemplate?: string;
   promptSerializer?: TemplateSerializer;
-  apiKey: string;
-  axoisInstance?: AxiosInstance;
+  openAiClient?: OpenAI;
+  apiKey?: string;
+  baseURL?: string;
+  dangerouslyAllowBrowser?: boolean;
   eventProducer?: EventProducer;
 }
 export class OpenAiChatExecutor implements ChatExecutor {
-  private apiKey: string;
-  private axios: AxiosInstance;
+  private openAiClient: OpenAI;
   private eventProducer: EventProducer;
   public modelId: string;
   constructor(private options: OpenAiChatExecutorOptions) {
     this.options.modelId ??= "gpt-4o";
     this.modelId = this.options.modelId;
-    this.apiKey = options.apiKey;
-    this.axios =
-      options.axoisInstance ??
-      axios.create({
-        baseURL: "https://api.openai.com/v1/",
+    this.openAiClient =
+      options.openAiClient ??
+      new OpenAI({
+        baseURL: options.baseURL || "https://api.openai.com/v1/",
+        apiKey: options.apiKey || "",
+        dangerouslyAllowBrowser: options.dangerouslyAllowBrowser || false,
       });
     this.eventProducer = options.eventProducer ?? eventProducer;
   }
@@ -68,22 +69,13 @@ export class OpenAiChatExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const response = await this.axios.post("chat/completions", request, {
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data: any = await response.data;
+    const data = await this.openAiClient.chat.completions.create(request);
     this.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       response: data,
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    if (response.status !== 200) {
-      throw new Error(data.error.message);
-    }
     const responseMessage: OpenAiChatMessage = data.choices[0].message;
     const msg = this.responseToChatMessage(responseMessage);
     return {
@@ -115,7 +107,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
     } else {
       return {
         role: "assistant",
-        content: message.content,
+        content: message.content || "",
         name: message.name,
       };
     }

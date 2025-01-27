@@ -1,6 +1,6 @@
 {
   "name": "@jbcbdse/charlie-openai",
-  "version": "0.1.0",
+  "version": "0.1.1-beta.3",
   "description": "",
   "repository": {
     "type": "git",
@@ -26,7 +26,7 @@
   "license": "MIT",
   "dependencies": {
     "@jbcbdse/charlie-core": "^0.1.0",
-    "axios": "^1.7.7",
+    "openai": "^4.79.1",
     "zod-to-json-schema": "^3.23.2"
   }
 }

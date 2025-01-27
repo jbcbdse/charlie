@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from "axios";
+import OpenAI from "openai";
 import {
   TextEmbeddingGenerator,
   TextEmbeddingInput,
@@ -6,10 +6,11 @@ import {
 } from "@jbcbdse/charlie-core";
 
 export interface OpenAiTextEmbeddingGeneratorOptions {
-  apiKey: string;
   dimensions?: number;
   modelId: string;
-  axiosInstance?: AxiosInstance;
+  openAiClient?: OpenAI;
+  apiKey?: string;
+  baseURL?: string;
 }
 
 interface OpenAiEmbeddingResponse {
@@ -25,14 +26,17 @@ interface OpenAiEmbeddingResponseEmbedding {
 }
 export class OpenAiTextEmbeddingGenerator implements TextEmbeddingGenerator {
   private dimensions?: number;
-  private apiKey: string;
+  private openAiClient: OpenAI;
   public modelId: string;
-  private axios: AxiosInstance;
   constructor(options: OpenAiTextEmbeddingGeneratorOptions) {
-    this.apiKey = options.apiKey;
     this.dimensions = options.dimensions;
     this.modelId = options.modelId;
-    this.axios = options.axiosInstance ?? axios.create();
+    this.openAiClient =
+      options.openAiClient ??
+      new OpenAI({
+        baseURL: options.baseURL || "https://api.openai.com/v1/",
+        apiKey: options.apiKey || "",
+      });
   }
   public async getEmbedding(
     input: TextEmbeddingInput,
@@ -40,19 +44,12 @@ export class OpenAiTextEmbeddingGenerator implements TextEmbeddingGenerator {
     const request = {
       input: input.text,
       model: this.modelId,
-      encoding_format: "float",
+      encoding_format: "float" as const,
       dimensions: this.dimensions,
     };
-    const response = await this.axios.post(
-      "https://api.openai.com/v1/embeddings",
-      request,
-      {
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-        },
-      },
-    );
-    const data: OpenAiEmbeddingResponse = response.data;
+    const data: OpenAiEmbeddingResponse =
+      await this.openAiClient.embeddings.create(request);
+
     return {
       modelId: this.modelId,
       embedding: data.data[0].embedding,
