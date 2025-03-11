@@ -20,6 +20,8 @@ import { GeminiExecutor } from "@ifit/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@ifit/charlie-openai";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
+import dotenv from "dotenv";
+dotenv.config({ path: "../../.env" });
 
 events.on(EventName.ToolStart, (data) => {
   // console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));

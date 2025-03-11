@@ -11,6 +11,8 @@ export interface OpenAiTextEmbeddingGeneratorOptions {
   openAiClient?: OpenAI;
   apiKey?: string;
   baseURL?: string;
+  maxRetries?: number;
+  timeout?: number;
 }
 
 interface OpenAiEmbeddingResponse {
@@ -36,6 +38,8 @@ export class OpenAiTextEmbeddingGenerator implements TextEmbeddingGenerator {
       new OpenAI({
         baseURL: options.baseURL || "https://api.openai.com/v1/",
         apiKey: options.apiKey || "",
+        maxRetries: options.maxRetries || undefined,
+        timeout: options.timeout || undefined,
       });
   }
   public async getEmbedding(
