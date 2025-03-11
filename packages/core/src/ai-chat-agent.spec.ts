@@ -31,6 +31,16 @@ class CalculatorTool extends BaseTool {
   }
 }
 
+class PingPongTool extends BaseTool {
+  public name = "PingPongTool";
+  public description = "Call this tool if the user says the word 'ping'";
+  public schema = z.object({});
+  public returnDirect = true;
+  public handler(): string {
+    return "pong";
+  }
+}
+
 class MockExecutor implements ChatExecutor {
   modelId = "mock-model-id";
   execute = jest.fn(function (
@@ -50,6 +60,17 @@ class MockExecutor implements ChatExecutor {
               arguments: { expr },
             },
             id: "toolcall1",
+            type: "function",
+          },
+        ],
+      };
+    } else if (message.role === "user" && message.content.match(/ping/i)) {
+      responseMessage = {
+        role: "tool_call",
+        toolCalls: [
+          {
+            function: { name: "PingPongTool", arguments: {} },
+            id: "toolcall2",
             type: "function",
           },
         ],
@@ -104,6 +125,17 @@ describe("AiChatAgent", () => {
       expect(responseMessage.content).toBe(
         "The CalculatorTool tool said: 3 + 4 = 7",
       );
+      expect(response.responseMessages).toMatchSnapshot();
+    });
+    it("should return the direct response from a tool where returnDirect is true", async () => {
+      const response = await agent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "ping" }],
+        tools: [new PingPongTool()],
+      });
+      const responseMessage = response.responseMessage as MessageAssistant;
+      expect(responseMessage.role).toBe("assistant");
+      expect(responseMessage.content).toBe("pong");
       expect(response.responseMessages).toMatchSnapshot();
     });
   });

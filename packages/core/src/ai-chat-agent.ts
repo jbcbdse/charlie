@@ -7,6 +7,7 @@ import {
   MessageToolCall,
   ChatAgentContext,
   MessageTool,
+  MessageAssistant,
 } from "./types";
 import { ToolExecutor } from "./tool-executor";
 import { EventName, eventProducer, EventProducer } from "./event-producer";
@@ -113,6 +114,15 @@ export class AiChatAgent implements ChatAgent {
         let newMessages = [...newResponseMessages, ...toolResponses];
         for (const transformer of this.postToolCallTransformers) {
           newMessages = await transformer.transform(newMessages, context);
+        }
+        const directResponse = toolResponses.find((t) => t.returnDirect);
+        if (directResponse) {
+          const directMessage: MessageAssistant = {
+            role: "assistant",
+            content: directResponse.content,
+          };
+          responseMessages.push(directMessage);
+          doLoop = false;
         }
         messages = [...messages, ...newMessages];
       } else {

@@ -20,12 +20,43 @@ exports[`AiChatAgent getResponse should call a tool and return the response, alo
   {
     "content": "3 + 4 = 7",
     "name": "CalculatorTool",
+    "returnDirect": false,
     "role": "tool",
     "status": "success",
     "toolCallId": "toolcall1",
   },
   {
     "content": "The CalculatorTool tool said: 3 + 4 = 7",
+    "role": "assistant",
+  },
+]
+`;
+
+exports[`AiChatAgent getResponse should return the direct response from a tool where returnDirect is true 1`] = `
+[
+  {
+    "role": "tool_call",
+    "toolCalls": [
+      {
+        "function": {
+          "arguments": {},
+          "name": "PingPongTool",
+        },
+        "id": "toolcall2",
+        "type": "function",
+      },
+    ],
+  },
+  {
+    "content": "pong",
+    "name": "PingPongTool",
+    "returnDirect": true,
+    "role": "tool",
+    "status": "success",
+    "toolCallId": "toolcall2",
+  },
+  {
+    "content": "pong",
     "role": "assistant",
   },
 ]
