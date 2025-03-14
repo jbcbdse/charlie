@@ -68,6 +68,7 @@ export interface MessageTool {
   /** The name of the tool that was called */
   name: string;
   toolCallId: string;
+  returnDirect: boolean;
   status: "success" | "error";
 }
 

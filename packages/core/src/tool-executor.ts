@@ -28,6 +28,7 @@ export class ToolExecutor {
             toolCallId: toolCall.id,
             name: toolCall.function.name,
             status: "error" as const,
+            returnDirect: false,
           };
         }
         const toolStartMs = Date.now();
@@ -44,6 +45,7 @@ export class ToolExecutor {
             toolCallId: toolCall.id,
             name: tool.name,
             status: "success" as const,
+            returnDirect: tool.returnDirect || false,
           }))
           .catch((err) => ({
             role: "tool" as const,
@@ -51,6 +53,7 @@ export class ToolExecutor {
             toolCallId: toolCall.id,
             name: tool.name,
             status: "error" as const,
+            returnDirect: false,
           }));
         this.eventProducer.emit(EventName.ToolEnd, {
           context,

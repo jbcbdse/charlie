@@ -21,6 +21,8 @@ import { GrokExecutor, OpenAiChatExecutor } from "@ifit/charlie-openai";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
 import dotenv from "dotenv";
+import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
+import { DeleteAccountTool } from "../tools/delete-account.tool";
 dotenv.config({ path: "../../.env" });
 
 events.on(EventName.ToolStart, (data) => {
@@ -139,6 +141,8 @@ const tools = [
   new CountLettersTool(),
   new CurrentTimeTool(),
   new CalculatorTool(),
+  new DirectBirthdayTool(),
+  new DeleteAccountTool(),
 ];
 const messageHistory: ChatMessage[] = [];
 const availableAgents: AvailableAgent[] = Object.keys(
