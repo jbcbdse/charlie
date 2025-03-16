@@ -1,6 +1,6 @@
 {
   "name": "@jbcbdse/charlie-bedrock",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "",
   "repository": {
     "type": "git",
@@ -22,11 +22,11 @@
     "lint": "eslint --config ../../eslint.config.mjs .",
     "test": "jest"
   },
-  "author": "iFIT",
+  "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.623.0",
-    "@jbcbdse/charlie-core": "^0.1.0",
+    "@jbcbdse/charlie-core": "^0.2.0",
     "uuid": "^10.0.0"
   }
 }

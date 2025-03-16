@@ -19,6 +19,8 @@ export interface OpenAiChatExecutorOptions {
   baseURL?: string;
   dangerouslyAllowBrowser?: boolean;
   eventProducer?: EventProducer;
+  maxRetries?: number;
+  timeout?: number;
 }
 export class OpenAiChatExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
@@ -33,6 +35,8 @@ export class OpenAiChatExecutor implements ChatExecutor {
         baseURL: options.baseURL || "https://api.openai.com/v1/",
         apiKey: options.apiKey || "",
         dangerouslyAllowBrowser: options.dangerouslyAllowBrowser || false,
+        maxRetries: options.maxRetries || undefined,
+        timeout: options.timeout || undefined,
       });
     this.eventProducer = options.eventProducer ?? eventProducer;
   }

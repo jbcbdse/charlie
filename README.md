@@ -6,7 +6,7 @@ Charlie is the handler of many agents.
 
 ## Installation
 
-This package is published to the github registry, so set this in .npmrc:
+Configure your .npmrc to install these packages from github:
 
 ```
 @jbcbdse:registry=https://npm.pkg.github.com

@@ -13,6 +13,11 @@ export interface ITool {
    * JSON schema for the parameters of the tool
    */
   readonly jsonSchema: any;
+  /**
+   * if true, the tool response will be returned directly to the user
+   * if false, the tool response will be sent back to the LLM
+   */
+  returnDirect?: boolean;
   handle(params: any, context: ChatAgentContext): Promise<string>;
 }
 /**
@@ -22,6 +27,7 @@ export abstract class BaseTool implements ITool {
   public abstract name: string;
   public abstract description: string;
   public abstract schema: z.ZodType;
+  public returnDirect = false;
   public get jsonSchema(): any {
     return zodToJsonSchema(this.schema);
   }

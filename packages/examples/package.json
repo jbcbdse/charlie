@@ -1,6 +1,6 @@
 {
   "name": "@jbcbdse/charlie-examples",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "",
   "repository": {
     "type": "git",
@@ -10,15 +10,17 @@
   "scripts": {
     "build": "tsc -p ./tsconfig.json",
     "lint": "eslint --config ../../eslint.config.mjs .",
+    "start:repl": "ts-node ./src/repl/index.ts",
     "test": "jest"
   },
-  "author": "iFIT",
+  "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
-    "@jbcbdse/charlie-bedrock": "^0.1.0",
-    "@jbcbdse/charlie-openai": "^0.1.0",
-    "@jbcbdse/charlie-google": "^0.1.0",
-    "@jbcbdse/charlie-core": "^0.1.0",
+    "@jbcbdse/charlie-bedrock": "^0.2.0",
+    "@jbcbdse/charlie-core": "^0.2.0",
+    "@jbcbdse/charlie-google": "^0.2.0",
+    "@jbcbdse/charlie-openai": "^0.2.0",
+    "dotenv": "^16.4.7",
     "expr-eval": "^2.0.2",
     "zod": "^3.23.8"
   }
