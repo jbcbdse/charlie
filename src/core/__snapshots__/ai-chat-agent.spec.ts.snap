@@ -1,0 +1,32 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`AiChatAgent getResponse should call a tool and return the response, along with intermediate steps including tool calls 1`] = `
+[
+  {
+    "role": "tool_call",
+    "toolCalls": [
+      {
+        "function": {
+          "arguments": {
+            "expr": "3 + 4",
+          },
+          "name": "CalculatorTool",
+        },
+        "id": "toolcall1",
+        "type": "function",
+      },
+    ],
+  },
+  {
+    "content": "7",
+    "name": "CalculatorTool",
+    "role": "tool",
+    "status": "success",
+    "toolCallId": "toolcall1",
+  },
+  {
+    "content": "The CalculatorTool tool said: 7",
+    "role": "assistant",
+  },
+]
+`;
