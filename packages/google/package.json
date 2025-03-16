@@ -2,6 +2,10 @@
   "name": "@ifit/charlie-google",
   "version": "0.1.1",
   "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ifit/charlie.git"
+  },
   "main": "dist/index.js",
   "exports": {
     ".": {
