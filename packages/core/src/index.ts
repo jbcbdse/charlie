@@ -20,6 +20,7 @@ export {
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
+  Transcriber,
 } from "./types";
 export { events } from "./event-subscriber";
 export {

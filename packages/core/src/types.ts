@@ -1,3 +1,4 @@
+import type * as fs from "fs";
 /*
 These types are designed roughly based on the OpenAI Chat API and the Bedrock Converse API with Typescript and history storage in mind.
 
@@ -143,4 +144,9 @@ export interface TextEmbeddingOutput {
 }
 export interface TextEmbeddingGenerator {
   getEmbedding(input: TextEmbeddingInput): Promise<TextEmbeddingOutput>;
+}
+
+/** speech to text */
+export interface Transcriber {
+  transcribe(options: { file: fs.ReadStream }): Promise<{ text: string }>;
 }
