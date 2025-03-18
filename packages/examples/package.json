@@ -16,6 +16,10 @@
   "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-polly": "^3.0.0",
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/client-transcribe": "^3.0.0",
+    "@aws-sdk/client-transcribe-streaming": "^3.0.0",
     "@jbcbdse/charlie-bedrock": "^0.2.0",
     "@jbcbdse/charlie-core": "^0.2.0",
     "@jbcbdse/charlie-google": "^0.2.0",

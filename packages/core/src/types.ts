@@ -150,3 +150,11 @@ export interface TextEmbeddingGenerator {
 export interface Transcriber {
   transcribe(options: { file: fs.ReadStream }): Promise<{ text: string }>;
 }
+
+/**
+ * Interface for text-to-speech generation services
+ * Implementations can use various providers like OpenAI, AWS Polly
+ */
+export interface TextToSpeechGenerator {
+  generate(text: string): Promise<{ buffer: Buffer; format: string }>;
+}
