@@ -1,10 +1,10 @@
 {
-  "name": "@jbcbdse/charlie-google",
+  "name": "@ifit/charlie-google",
   "version": "0.2.0",
   "description": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jbcbdse/charlie.git"
+    "url": "git+https://github.com/ifit/charlie.git"
   },
   "main": "dist/index.js",
   "exports": {
@@ -22,11 +22,11 @@
     "lint": "eslint --config ../../eslint.config.mjs .",
     "test": "jest"
   },
-  "author": "Jonathan Barnett",
+  "author": "iFIT",
   "license": "MIT",
   "dependencies": {
     "@google/generative-ai": "^0.19.0",
-    "@jbcbdse/charlie-core": "^0.2.0",
+    "@ifit/charlie-core": "^0.2.0",
     "@openapi-contrib/json-schema-to-openapi-schema": "^3.0.2"
   }
 }

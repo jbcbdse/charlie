@@ -5,7 +5,7 @@
   "private": true,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jbcbdse/charlie.git"
+    "url": "git+https://github.com/ifit/charlie.git"
   },
   "workspaces": [
     "packages/*"
@@ -20,7 +20,7 @@
     "start": "node -r ts-node/register -r dotenv/config packages/examples/src/repl/index.ts",
     "test": "npm run test --workspaces"
   },
-  "author": "Jonathan Barnett",
+  "author": "iFIT",
   "license": "MIT",
   "devDependencies": {
     "@tsconfig/node20": "^20.1.4",

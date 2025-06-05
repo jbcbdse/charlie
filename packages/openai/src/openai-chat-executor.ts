@@ -9,7 +9,7 @@ import {
   EventName,
   eventProducer,
   EventProducer,
-} from "@jbcbdse/charlie-core";
+} from "@ifit/charlie-core";
 
 export interface OpenAiChatExecutorOptions {
   modelId: string;

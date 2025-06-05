@@ -1,4 +1,4 @@
-import { ITool } from "@jbcbdse/charlie-core";
+import { ITool } from "@ifit/charlie-core";
 
 export class ToolPromptGenerator {
   /**

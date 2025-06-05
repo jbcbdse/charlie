@@ -13,7 +13,7 @@ import {
   EventName,
   eventProducer,
   EventProducer,
-} from "@jbcbdse/charlie-core";
+} from "@ifit/charlie-core";
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
 import { MessageConverter } from "./message-converter";
@@ -105,18 +105,18 @@ export class BedrockChatExecutor implements ChatExecutor {
       toolConfig:
         tools && tools.length > 0 && this.toolsSupported
           ? {
-              tools:
-                tools &&
-                tools.map((tool) => ({
-                  toolSpec: {
-                    inputSchema: {
-                      json: tool.jsonSchema,
-                    },
-                    name: tool.name,
-                    description: tool.description,
+            tools:
+              tools &&
+              tools.map((tool) => ({
+                toolSpec: {
+                  inputSchema: {
+                    json: tool.jsonSchema,
                   },
-                })),
-            }
+                  name: tool.name,
+                  description: tool.description,
+                },
+              })),
+          }
           : undefined,
     };
     const chatExecutorStartMs = Date.now();

@@ -1,4 +1,4 @@
-import { ChatMessage } from "@jbcbdse/charlie-core";
+import { ChatMessage } from "@ifit/charlie-core";
 import { Message } from "@aws-sdk/client-bedrock-runtime";
 
 export class MessageConverter {
@@ -40,15 +40,15 @@ export class MessageConverter {
           (call): ContentBlock =>
             this.toolsSupported
               ? {
-                  toolUse: {
-                    toolUseId: call.id,
-                    name: call.function.name,
-                    input: call.function.arguments as DocumentType,
-                  },
-                }
-              : {
-                  text: `Tool call:\n${JSON.stringify([{ name: call.function.name, arguments: call.function.arguments }])}`,
+                toolUse: {
+                  toolUseId: call.id,
+                  name: call.function.name,
+                  input: call.function.arguments as DocumentType,
                 },
+              }
+              : {
+                text: `Tool call:\n${JSON.stringify([{ name: call.function.name, arguments: call.function.arguments }])}`,
+              },
         ),
       };
     }

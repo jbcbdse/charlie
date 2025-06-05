@@ -1,5 +1,5 @@
 import toOpenApi from "@openapi-contrib/json-schema-to-openapi-schema";
-import { ITool } from "@jbcbdse/charlie-core";
+import { ITool } from "@ifit/charlie-core";
 import { FunctionDeclaration, Tool } from "@google/generative-ai";
 
 export class ToolConverter {

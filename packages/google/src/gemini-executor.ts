@@ -4,7 +4,7 @@ import {
   EventName,
   eventProducer,
   ChatAgentGetResponseOutput,
-} from "@jbcbdse/charlie-core";
+} from "@ifit/charlie-core";
 import {
   GenerateContentRequest,
   GenerativeModel,
