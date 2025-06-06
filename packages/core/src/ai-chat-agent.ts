@@ -68,6 +68,7 @@ export class AiChatAgent implements ChatAgent {
       if (!started) {
         this.eventProducer.emit(EventName.ChatStart, {
           context,
+          startTime: chatStartMs,
           messages,
           systemPrompt,
           modelId: this.chatExecutor.modelId,
@@ -77,6 +78,7 @@ export class AiChatAgent implements ChatAgent {
       const chatExecutorStartMs = Date.now();
       this.eventProducer.emit(EventName.ChatExecutorStart, {
         context,
+        startTime: chatExecutorStartMs,
         messages,
         systemPrompt,
         modelId: this.chatExecutor.modelId,
@@ -98,8 +100,12 @@ export class AiChatAgent implements ChatAgent {
       this.eventProducer.emit(EventName.ChatExecutorEnd, {
         context,
         messages: newResponseMessages,
+        modelProvider: this.chatExecutor.modelProvider,
         modelId: this.chatExecutor.modelId,
+        startTime: chatExecutorStartMs,
         timeMs: Date.now() - chatExecutorStartMs,
+        responseMessages: newResponseMessages,
+        usage: response.usage,
       });
       const toolCalls = newResponseMessages.filter(
         (m) => m.role === "tool_call",
@@ -131,6 +137,7 @@ export class AiChatAgent implements ChatAgent {
           context,
           messages: response.responseMessages,
           modelId: this.chatExecutor.modelId,
+          startTime: chatExecutorStartMs,
           timeMs: Date.now() - chatStartMs,
         });
       }

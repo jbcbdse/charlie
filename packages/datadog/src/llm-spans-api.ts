@@ -1,13 +1,15 @@
 import axios, { AxiosInstance } from "axios";
-import { EventName, EventSubscriber } from "@ifit/charlie-core";
-import { v4 as uuid } from "uuid";
-import { ChatAgentContext, ChatMessage } from "../../core/dist";
 import {
+  EventName,
+  EventSubscriber,
+  ChatAgentContext,
+  ChatMessage,
   EventChatEnd,
   EventChatExecutorEnd,
   EventChatStart,
   EventToolEnd,
-} from "../../core/dist/event-producer";
+} from "@ifit/charlie-core";
+import { v4 as uuid } from "uuid";
 
 interface SpansRequest {
   data: SpansRequestData;
@@ -48,13 +50,13 @@ interface Metrics {
 }
 interface Meta {
   kind:
-    | "agent"
-    | "workflow"
-    | "llm"
-    | "tool"
-    | "task"
-    | "embedding"
-    | "retrieval";
+  | "agent"
+  | "workflow"
+  | "llm"
+  | "tool"
+  | "task"
+  | "embedding"
+  | "retrieval";
   error?: DDError;
   input: IO;
   output: IO;
@@ -182,23 +184,21 @@ export class LlmSpansApi {
       },
     };
     this.runs.delete(event.context.runId);
+    if (runData.timer) {
+      clearTimeout(runData.timer);
+    }
     this.axiosInstance
       .post(
         "https://api.datadoghq.com/api/intake/llm-obs/v1/trace/spans",
         request,
         {},
       )
-      .then(() => {})
       .catch((err) => {
         console.error("Failed to send spans to Datadog", {
           error: err,
           requestErrors: err.response.data.errors,
         });
       });
-    if (runData.timer) {
-      clearTimeout(runData.timer);
-    }
-    this.runs.delete(event.context.runId);
   }
 
   private handleToolEnd(event: EventToolEnd) {
@@ -253,7 +253,6 @@ export class LlmSpansApi {
         },
         model_provider: event.modelProvider,
         model_name: event.modelId,
-        foo: "bar",
       },
       session_id: event.context.runId,
       tags: Object.entries(this.tags).map(([key, value]) => `${key}:${value}`),

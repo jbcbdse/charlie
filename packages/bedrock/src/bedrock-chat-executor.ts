@@ -20,6 +20,7 @@ import { MessageConverter } from "./message-converter";
 export type BedrockClientCredentials =
   BedrockRuntimeClientConfig["credentials"];
 export class BedrockChatExecutor implements ChatExecutor {
+  public modelProvider: string;
   public modelId: string;
   private client: BedrockRuntime;
   private toolPromptGenerator: ToolPromptGenerator;
@@ -30,6 +31,7 @@ export class BedrockChatExecutor implements ChatExecutor {
   constructor(options: {
     client?: BedrockRuntime;
     credentials?: BedrockClientCredentials;
+    modelProvider?: string;
     modelId: string;
     /**
      * Whether the model supports tool calling
@@ -53,6 +55,7 @@ export class BedrockChatExecutor implements ChatExecutor {
       new BedrockRuntime({
         credentials: options.credentials,
       });
+    this.modelProvider = options.modelProvider ?? "aws-bedrock";
     this.modelId = options.modelId;
     this.toolsSupported = options.toolsSupported ?? true;
     options.toolParser || new InlineToolCallParser();
@@ -96,6 +99,18 @@ export class BedrockChatExecutor implements ChatExecutor {
     }
     const bedrockMessages =
       this.messageConverter.toBedrockMessages(remainingMessages);
+    const toolConfig = {
+      tools:
+        tools && tools.map((tool) => ({
+          toolSpec: {
+            inputSchema: {
+              json: tool.jsonSchema,
+            },
+            name: tool.name,
+            description: tool.description,
+          },
+        })),
+    };
     const request: ConverseCommandInput = {
       modelId: this.modelId,
       messages: bedrockMessages,
@@ -104,19 +119,7 @@ export class BedrockChatExecutor implements ChatExecutor {
         : undefined,
       toolConfig:
         tools && tools.length > 0 && this.toolsSupported
-          ? {
-            tools:
-              tools &&
-              tools.map((tool) => ({
-                toolSpec: {
-                  inputSchema: {
-                    json: tool.jsonSchema,
-                  },
-                  name: tool.name,
-                  description: tool.description,
-                },
-              })),
-          }
+          ? toolConfig
           : undefined,
     };
     const chatExecutorStartMs = Date.now();
@@ -132,12 +135,18 @@ export class BedrockChatExecutor implements ChatExecutor {
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
+    response.usage?.inputTokens
     const responseMessages = this.parseResponseContent(
       response.output!.message!.content!,
     );
     return {
       responseMessage: responseMessages[responseMessages.length - 1],
       responseMessages,
+      usage: response.usage && {
+        inputTokens: response.usage.inputTokens || 0,
+        outputTokens: response.usage.outputTokens || 0,
+        totalTokens: response.usage.totalTokens || 0,
+      },
     };
   }
 

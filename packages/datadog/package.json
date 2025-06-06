@@ -1,6 +1,6 @@
 {
   "name": "@ifit/charlie-datadog",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
   "author": "iFIT",
   "license": "MIT",
   "dependencies": {
-    "@ifit/charlie-core": "^0.0.1",
+    "@ifit/charlie-core": "^0.2.0",
     "axios": "^1.7.7",
     "uuid": "^10.0.0"
   }

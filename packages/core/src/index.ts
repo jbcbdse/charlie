@@ -27,4 +27,8 @@ export {
   EventTypeMap,
   eventProducer,
   EventProducer,
+  EventChatEnd,
+  EventChatStart,
+  EventChatExecutorEnd,
+  EventToolEnd,
 } from "./event-producer";

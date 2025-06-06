@@ -14,6 +14,7 @@ interface ChatEndEvent extends ChatEvent {
 }
 export interface EventChatStart extends ChatEvent {
   modelId: string;
+  startTime: number;
   /**
    * Messages sent to the LLM
    */
@@ -22,6 +23,8 @@ export interface EventChatStart extends ChatEvent {
 }
 export interface EventChatEnd extends ChatEndEvent {
   modelId: string;
+  startTime: number;
+  timeMs: number;
   /** Messages in response from the LLM */
   messages: ChatMessage[];
 }
@@ -32,20 +35,34 @@ export interface EventToolsEnd extends ChatEndEvent {
   toolMessages: MessageTool[];
 }
 export interface EventToolStart extends ChatEvent {
+  startTime: number;
   toolCall: MessageToolCall;
   toolCallId: string;
 }
 export interface EventToolEnd extends ChatEndEvent {
+  startTime: number;
+  toolCall: MessageToolCall;
+  toolCallId: string;
   toolMessage: MessageTool;
 }
 export interface EventChatExecutorStart extends ChatEvent {
   modelId: string;
   messages: ChatMessage[];
   systemPrompt?: string;
+  startTime: number;
 }
 export interface EventChatExecutorEnd extends ChatEndEvent {
   modelId: string;
+  modelProvider: string;
   messages: ChatMessage[];
+  startTime: number;
+  timeMs: number;
+  responseMessages: ChatMessage[];
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
 }
 export interface EventChatRawRequest extends ChatEvent {
   modelId: string;
