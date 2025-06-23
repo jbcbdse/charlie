@@ -137,7 +137,7 @@ export class AiChatAgent implements ChatAgent {
           context,
           messages: response.responseMessages,
           modelId: this.chatExecutor.modelId,
-          startTime: chatExecutorStartMs,
+          startTime: chatStartMs,
           timeMs: Date.now() - chatStartMs,
         });
       }
