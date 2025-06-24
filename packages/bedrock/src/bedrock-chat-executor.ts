@@ -135,7 +135,6 @@ export class BedrockChatExecutor implements ChatExecutor {
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    response.usage?.inputTokens
     const responseMessages = this.parseResponseContent(
       response.output!.message!.content!,
     );
