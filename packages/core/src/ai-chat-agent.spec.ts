@@ -43,6 +43,7 @@ class PingPongTool extends BaseTool {
 
 class MockExecutor implements ChatExecutor {
   modelId = "mock-model-id";
+  modelProvider = "mock-model-provider";
   execute = jest.fn(function (
     input: ChatAgentGetResponseInput,
   ): Promise<ChatAgentGetResponseOutput> {

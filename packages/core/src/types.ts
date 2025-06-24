@@ -114,6 +114,11 @@ export interface ChatAgentGetResponseInput {
 export interface ChatAgentGetResponseOutput {
   responseMessage: ChatMessage;
   responseMessages: ChatMessage[];
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
 }
 export interface ChatAgent {
   getResponse(
@@ -131,6 +136,12 @@ export interface ChatExecutor {
    * The id of the model to use for this executor, specific to the model within the given API
    */
   modelId: string;
+  /**
+   * The model provider to use for this executor, specific to the model within the given API
+   *
+   * This is used for monitoring, such as with Datadog LLM Observability
+   */
+  modelProvider: string;
   execute(input: ChatExecutorInput): Promise<ChatAgentGetResponseOutput>;
 }
 

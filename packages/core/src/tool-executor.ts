@@ -34,6 +34,7 @@ export class ToolExecutor {
         const toolStartMs = Date.now();
         this.eventProducer.emit(EventName.ToolStart, {
           context,
+          startTime: toolStartMs,
           toolCall: toolCallMessage,
           toolCallId: toolCall.id,
         });
@@ -57,7 +58,10 @@ export class ToolExecutor {
           }));
         this.eventProducer.emit(EventName.ToolEnd, {
           context,
+          startTime: toolStartMs,
           timeMs: Date.now() - toolStartMs,
+          toolCall: toolCallMessage,
+          toolCallId: toolCall.id,
           toolMessage: toolMessage,
         });
         return toolMessage;

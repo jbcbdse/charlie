@@ -21,10 +21,14 @@ export {
   TextEmbeddingInput,
   TextEmbeddingOutput,
 } from "./types";
-export { events } from "./event-subscriber";
+export { events, EventSubscriber } from "./event-subscriber";
 export {
   EventName,
   EventTypeMap,
   eventProducer,
   EventProducer,
+  EventChatEnd,
+  EventChatStart,
+  EventChatExecutorEnd,
+  EventToolEnd,
 } from "./event-producer";
