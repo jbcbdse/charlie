@@ -20,6 +20,7 @@ import { GeminiExecutor } from "@jbcbdse/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
+import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
 import dotenv from "dotenv";
 import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
 import { DeleteAccountTool } from "../tools/delete-account.tool";
@@ -38,6 +39,15 @@ events.on(EventName.ChatEnd, (data) => {
   console.dir(data.messages, { depth: null });
   console.log(data.modelId, "complete");
 });
+if (process.env.DD_API_KEY) {
+  new LlmSpansApi({
+    apiKey: process.env.DD_API_KEY!,
+    tags: {
+      service: "charlie",
+      env: "dev",
+    },
+  }).listen(events);
+}
 // events.on(EventName.ChatRawResponse, (data) => {
 //   // console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
 // });

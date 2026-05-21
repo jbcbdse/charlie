@@ -12,6 +12,7 @@ import {
 } from "@jbcbdse/charlie-core";
 
 export interface OpenAiChatExecutorOptions {
+  modelProvider?: string;
   modelId: string;
   promptSerializer?: TemplateSerializer;
   openAiClient?: OpenAI;
@@ -25,9 +26,11 @@ export interface OpenAiChatExecutorOptions {
 export class OpenAiChatExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
   private eventProducer: EventProducer;
+  public modelProvider: string;
   public modelId: string;
   constructor(private options: OpenAiChatExecutorOptions) {
     this.options.modelId ??= "gpt-4o";
+    this.modelProvider = options.modelProvider ?? "openai";
     this.modelId = this.options.modelId;
     this.openAiClient =
       options.openAiClient ??
@@ -85,6 +88,11 @@ export class OpenAiChatExecutor implements ChatExecutor {
     return {
       responseMessage: msg,
       responseMessages: [msg],
+      usage: data.usage && {
+        inputTokens: data.usage.prompt_tokens,
+        outputTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens,
+      },
     };
   }
 

@@ -14,17 +14,20 @@ import { ToolConverter } from "./tool-converter";
 import { MessageConverter } from "./message-converter";
 
 export class GeminiExecutor implements ChatExecutor {
+  public modelProvider: string;
   public modelId: string;
   private toolConverter: ToolConverter;
   private messageConverter: MessageConverter;
   private model: GenerativeModel;
   constructor(options: {
+    modelProvider?: string;
     modelId: string;
     apiKey: string;
     messageConverter?: MessageConverter;
     toolConverter?: ToolConverter;
   }) {
     const genAi = new GoogleGenerativeAI(options.apiKey);
+    this.modelProvider = options.modelProvider ?? "google";
     this.modelId = options.modelId;
     this.model = genAi.getGenerativeModel({ model: options.modelId });
     this.messageConverter = options.messageConverter || new MessageConverter();
@@ -60,6 +63,13 @@ export class GeminiExecutor implements ChatExecutor {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       responseMessage: responseMessages.at(-1)!,
       responseMessages,
+      usage: response.response.usageMetadata && {
+        inputTokens:
+          (response.response.usageMetadata.promptTokenCount || 0) +
+          (response.response.usageMetadata.cachedContentTokenCount || 0),
+        outputTokens: response.response.usageMetadata.candidatesTokenCount,
+        totalTokens: response.response.usageMetadata.totalTokenCount,
+      },
     };
   }
 }

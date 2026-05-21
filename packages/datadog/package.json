@@ -1,22 +1,8 @@
 {
-  "name": "@jbcbdse/charlie-bedrock",
+  "name": "@jbcbdse/charlie-datadog",
   "version": "0.3.0",
   "description": "",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jbcbdse/charlie.git"
-  },
   "main": "dist/index.js",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js"
-    }
-  },
-  "files": [
-    "dist",
-    "package.json"
-  ],
   "scripts": {
     "build": "tsc -p ./tsconfig.json",
     "lint": "eslint --config ../../eslint.config.mjs .",
@@ -25,8 +11,8 @@
   "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.623.0",
     "@jbcbdse/charlie-core": "^0.3.0",
+    "axios": "^1.7.7",
     "uuid": "^10.0.0"
   }
 }

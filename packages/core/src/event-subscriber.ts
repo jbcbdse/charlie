@@ -6,6 +6,9 @@ import {
   EventTypeMap,
 } from "./event-producer";
 
+/**
+ * A strongly-typed event listener that can be used to subscribe to events from the EventProducer
+ */
 export class EventSubscriber {
   private emitter: EventEmitter;
   constructor(producer?: EventProducer) {
