@@ -3,7 +3,7 @@ import {
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
-} from "@jbcbdse/charlie-core";
+} from "@ifit/charlie-core";
 
 export interface OpenAiTextEmbeddingGeneratorOptions {
   dimensions?: number;

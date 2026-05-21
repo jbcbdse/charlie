@@ -1,10 +1,10 @@
 {
-  "name": "@jbcbdse/charlie-openai",
-  "version": "0.2.0",
+  "name": "@ifit/charlie-openai",
+  "version": "0.3.0",
   "description": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jbcbdse/charlie.git"
+    "url": "git+https://github.com/ifit/charlie.git"
   },
   "main": "dist/index.js",
   "exports": {
@@ -22,10 +22,10 @@
     "lint": "eslint --config ../../eslint.config.mjs .",
     "test": "jest"
   },
-  "author": "Jonathan Barnett",
+  "author": "iFIT",
   "license": "MIT",
   "dependencies": {
-    "@jbcbdse/charlie-core": "^0.2.0",
+    "@ifit/charlie-core": "^0.3.0",
     "openai": "^4.87.2",
     "zod-to-json-schema": "^3.23.2"
   }

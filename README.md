@@ -9,24 +9,24 @@ Charlie is the handler of many agents.
 Configure your .npmrc to install these packages from github:
 
 ```
-@jbcbdse:registry=https://npm.pkg.github.com
+@ifit:registry=https://npm.pkg.github.com
 ```
 
 Install core:
 
 ```
-npm install @jbcbdse/charlie-core
+npm install @ifit/charlie-core
 ```
 
 Install vendor-specific packages:
 
 ```
 # for openai (gpt)
-npm install @jbcbdse/charlie-openai
+npm install @ifit/charlie-openai
 # for bedrock
-npm install @jbcbdse/charlie-bedrock
+npm install @ifit/charlie-bedrock
 # for google (gemini)
-npm install @jbcbdse/charlie-google
+npm install @ifit/charlie-google
 ```
 
 ## Features
@@ -76,7 +76,7 @@ Tools are asynchronous functions that take a structured input and return a strin
 
 ```ts
 import { z } from "zod";
-import { BaseTool } from "@jbcbdse/charlie-core";
+import { BaseTool } from "@ifit/charlie-core";
 
 export class CountLettersTool extends BaseTool {
   public name = CountLettersTool.name;

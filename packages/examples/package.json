@@ -1,10 +1,10 @@
 {
-  "name": "@jbcbdse/charlie-examples",
-  "version": "0.2.0",
+  "name": "@ifit/charlie-examples",
+  "version": "0.3.0",
   "description": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jbcbdse/charlie.git"
+    "url": "git+https://github.com/ifit/charlie.git"
   },
   "main": "dist/index.js",
   "scripts": {
@@ -13,13 +13,14 @@
     "start:repl": "ts-node ./src/repl/index.ts",
     "test": "jest"
   },
-  "author": "Jonathan Barnett",
+  "author": "iFIT",
   "license": "MIT",
   "dependencies": {
-    "@jbcbdse/charlie-bedrock": "^0.2.0",
-    "@jbcbdse/charlie-core": "^0.2.0",
-    "@jbcbdse/charlie-google": "^0.2.0",
-    "@jbcbdse/charlie-openai": "^0.2.0",
+    "@ifit/charlie-bedrock": "^0.3.0",
+    "@ifit/charlie-core": "^0.3.0",
+    "@ifit/charlie-google": "^0.3.0",
+    "@ifit/charlie-openai": "^0.3.0",
+    "@ifit/charlie-datadog": "^0.3.0",
     "dotenv": "^16.4.7",
     "expr-eval": "^2.0.2",
     "zod": "^3.23.8"
