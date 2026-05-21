@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { BaseTool } from "@ifit/charlie-core";
+import { BaseTool } from "@jbcbdse/charlie-core";
 
 export class CountLettersTool extends BaseTool {
   public name = CountLettersTool.name;

@@ -1,4 +1,4 @@
-import { BaseTool } from "@ifit/charlie-core";
+import { BaseTool } from "@jbcbdse/charlie-core";
 import { z } from "zod";
 
 export class DeleteAccountTool extends BaseTool {

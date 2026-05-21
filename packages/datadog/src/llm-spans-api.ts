@@ -8,7 +8,7 @@ import {
   EventChatExecutorEnd,
   EventChatStart,
   EventToolEnd,
-} from "@ifit/charlie-core";
+} from "@jbcbdse/charlie-core";
 import { v4 as uuid } from "uuid";
 
 interface SpansRequest {

@@ -7,14 +7,14 @@ This provides a class that subscribes to Charlie's EventProducer and uses the Da
 ## Installation
 
 ```
-npm install @ifit/charlie-datadog
+npm install @jbcbdse/charlie-datadog
 ```
 
 ## Usage
 
 ```ts
-import { LlmSpansApi } from "@ifit/charlie-datadog";
-import { events } from "@ifit/charlie-core";
+import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
+import { events } from "@jbcbdse/charlie-core";
 // ...
 
 new LlmSpansApi({

@@ -1,5 +1,5 @@
 {
-  "name": "@ifit/charlie-datadog",
+  "name": "@jbcbdse/charlie-datadog",
   "version": "0.3.0",
   "description": "",
   "main": "dist/index.js",
@@ -8,10 +8,10 @@
     "lint": "eslint --config ../../eslint.config.mjs .",
     "test": "jest"
   },
-  "author": "iFIT",
+  "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
-    "@ifit/charlie-core": "^0.3.0",
+    "@jbcbdse/charlie-core": "^0.3.0",
     "axios": "^1.7.7",
     "uuid": "^10.0.0"
   }

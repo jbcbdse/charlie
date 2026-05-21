@@ -1,10 +1,10 @@
 {
-  "name": "@ifit/charlie-core",
+  "name": "@jbcbdse/charlie-core",
   "version": "0.3.0",
   "description": "",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ifit/charlie.git"
+    "url": "git+https://github.com/jbcbdse/charlie.git"
   },
   "main": "dist/index.js",
   "exports": {
@@ -22,7 +22,7 @@
     "lint": "eslint --config ../../eslint.config.mjs .",
     "test": "jest"
   },
-  "author": "iFIT",
+  "author": "Jonathan Barnett",
   "license": "MIT",
   "devDependencies": {
     "@types/lodash.get": "^4.4.9"
