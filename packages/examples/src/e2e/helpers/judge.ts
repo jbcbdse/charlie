@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:3456";
+import { BASE_URL } from "./config";
 
 export interface JudgeResult {
   pass: boolean;

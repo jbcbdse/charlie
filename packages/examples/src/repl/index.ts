@@ -75,30 +75,28 @@ type AvailableAgent =
 const agents: Record<AvailableAgent, ChatAgent> = {
   claude: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+      modelId: "us.anthropic.claude-sonnet-4-6",
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
   }),
   mistral: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "mistral.mistral-large-2402-v1:0",
+      modelId: "mistral.mistral-large-3-675b-instruct",
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
   }),
   commandr: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "cohere.command-r-plus-v1:0",
+      modelId: "us.meta.llama4-scout-17b-instruct-v1:0",
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
   }),
   llama: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "us.meta.llama3-2-90b-instruct-v1:0",
-      // "us.meta.llama3-1-70b-instruct-v1:0"
-      // "us.meta.llama3-2-90b-instruct-v1:0"
+      modelId: "us.meta.llama3-3-70b-instruct-v1:0",
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
@@ -112,14 +110,14 @@ const agents: Record<AvailableAgent, ChatAgent> = {
   }),
   nova: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "us.amazon.nova-lite-v1:0",
+      modelId: "us.amazon.nova-2-lite-v1:0",
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
   }),
   titan: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "amazon.titan-text-premier-v1:0",
+      modelId: "us.amazon.nova-micro-v1:0",
       toolsSupported: false,
     }),
     systemPromptTemplate: promptTemplate,
@@ -127,21 +125,21 @@ const agents: Record<AvailableAgent, ChatAgent> = {
   }),
   gpt4o: new AiChatAgent({
     chatExecutor: new OpenAiChatExecutor({
-      modelId: "gpt-4o-mini",
+      modelId: "o4-mini",
       apiKey: process.env.OPENAI_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
   }),
   grok: new AiChatAgent({
     chatExecutor: new GrokExecutor({
-      modelId: "grok-beta",
+      modelId: "grok-4.3",
       apiKey: process.env.XAI_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
   }),
   gemini: new AiChatAgent({
     chatExecutor: new GeminiExecutor({
-      modelId: "gemini-1.5-flash",
+      modelId: "gemini-2.5-flash",
       apiKey: process.env.GOOGLE_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,

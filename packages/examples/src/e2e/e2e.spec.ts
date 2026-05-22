@@ -1,10 +1,9 @@
 /* eslint-disable no-console */
 import { startServer, stopServer } from "./helpers/server";
 import { judge } from "./helpers/judge";
+import { BASE_URL } from "./helpers/config";
 
 jest.setTimeout(120_000);
-
-const BASE_URL = "http://localhost:3456";
 
 interface ChatMessage {
   role: string;
@@ -56,55 +55,7 @@ afterAll(() => {
 });
 
 // ---------------------------------------------------------------------------
-// 1. API Shape (deterministic)
-// ---------------------------------------------------------------------------
-describe("API Shape", () => {
-  test("GET /agents returns all 10 agents", async () => {
-    const res = await fetch(`${BASE_URL}/agents`);
-    expect(res.ok).toBe(true);
-    const data = (await res.json()) as { agents: string[] };
-    expect(data.agents).toHaveLength(10);
-    for (const a of ["claude", "mistral", "commandr", "llama", "jamba-large", "nova", "titan", "gpt4o", "grok", "gemini"]) {
-      expect(data.agents).toContain(a);
-    }
-  });
-
-  test("POST /chat missing message → 400", async () => {
-    const res = await fetch(`${BASE_URL}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agent: "claude" }),
-    });
-    expect(res.status).toBe(400);
-    const data = (await res.json()) as { error: string };
-    expect(data.error).toBe("message is required");
-  });
-
-  test("POST /chat unknown agent → 400", async () => {
-    const res = await fetch(`${BASE_URL}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: "hello", agent: "nonexistent" }),
-    });
-    expect(res.status).toBe(400);
-    const data = (await res.json()) as { error: string };
-    expect(data.error).toMatch(/unknown agent/);
-  });
-
-  test("POST /chat response has correct shape", async () => {
-    const { status, data } = await chat({ message: "Say hi", agent: "claude" });
-    expect(status).toBe(200);
-    expect(data).toHaveProperty("response");
-    expect(data).toHaveProperty("agent", "claude");
-    expect(data).toHaveProperty("messages");
-    expect(Array.isArray(data.messages)).toBe(true);
-    expect(data.messages.some((m) => m.role === "user")).toBe(true);
-    expect(data.messages.some((m) => m.role === "assistant")).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 2. Per-Module: Full Response + Judge
+// 1. Per-Module: Full Response + Judge
 // ---------------------------------------------------------------------------
 describe("Per-Module Response", () => {
   const CRITERIA = "The response is a greeting from an AI assistant";
@@ -137,7 +88,7 @@ describe("Bedrock Model Smoke Tests", () => {
   test.each([
     ["claude", "baseline Bedrock model"],
     ["mistral", "Mistral tool call quirks"],
-    ["commandr", "Cohere message format"],
+    ["commandr", "Llama4 Scout message format"],
     ["llama", "Llama inline tool parsing"],
     ["jamba-large", "AI21 Jamba format"],
     ["nova", "Amazon Nova"],

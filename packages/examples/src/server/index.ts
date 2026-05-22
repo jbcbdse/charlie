@@ -53,7 +53,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
   }),
   mistral: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "mistral.mistral-large-2402-v1:0",
+      modelId: "mistral.mistral-large-3-675b-instruct",
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
@@ -81,7 +81,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
   }),
   nova: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
-      modelId: "us.amazon.nova-lite-v1:0",
+      modelId: "us.amazon.nova-2-lite-v1:0",
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
@@ -96,7 +96,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
   }),
   gpt4o: new AiChatAgent({
     chatExecutor: new OpenAiChatExecutor({
-      modelId: "gpt-4o-mini",
+      modelId: "o4-mini",
       apiKey: process.env.OPENAI_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,

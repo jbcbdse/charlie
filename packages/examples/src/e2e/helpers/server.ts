@@ -2,8 +2,7 @@ import { spawn, ChildProcess, execSync } from "child_process";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-
-const BASE_URL = "http://localhost:3456";
+import { BASE_URL, PORT } from "./config";
 // __dirname = packages/examples/src/e2e/helpers — three levels up is packages/examples/
 const EXAMPLES_DIR = path.resolve(__dirname, "../../..");
 const ENV_FILE = path.resolve(EXAMPLES_DIR, "../../.env");
@@ -20,7 +19,7 @@ export async function startServer(): Promise<void> {
 
   serverProcess = spawn("npx", ["ts-node", "./src/server/index.ts"], {
     cwd: EXAMPLES_DIR,
-    env: { ...process.env, ...envFromFile },
+    env: { ...process.env, ...envFromFile, PORT: String(PORT) },
     stdio: "pipe",
   });
 
@@ -42,7 +41,7 @@ export function stopServer(): void {
 
 function killExistingServer(): void {
   try {
-    execSync("fuser -k 3456/tcp 2>/dev/null || true", { stdio: "ignore" });
+    execSync(`fuser -k ${PORT}/tcp 2>/dev/null || true`, { stdio: "ignore" });
     // Brief pause for port to free
     execSync("sleep 0.5", { stdio: "ignore" });
   } catch {
