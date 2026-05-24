@@ -2,6 +2,7 @@ import {
   ChatExecutor,
   ChatAgentGetResponseInput,
   ChatAgentGetResponseOutput,
+  ChatMessage,
   ChatMessageTransformer,
   ChatAgent,
   MessageToolCall,
@@ -63,6 +64,7 @@ export class AiChatAgent implements ChatAgent {
     context.messages = messages;
     let started = false;
     const chatStartMs = Date.now();
+    let lastLlmResponseMessages: ChatMessage[] = [];
     do {
       const systemPrompt = this.systemPromptTemplate
         ? this.templateSerializer.serialize(this.systemPromptTemplate, meta)
@@ -98,6 +100,7 @@ export class AiChatAgent implements ChatAgent {
           context,
         );
       }
+      lastLlmResponseMessages = newResponseMessages;
       responseMessages.push(...newResponseMessages);
       this.eventProducer.emit(EventName.ChatExecutorEnd, {
         context,
@@ -135,15 +138,15 @@ export class AiChatAgent implements ChatAgent {
         messages = [...messages, ...newMessages];
       } else {
         doLoop = false;
-        this.eventProducer.emit(EventName.ChatEnd, {
-          context,
-          messages: response.responseMessages,
-          modelId: this.chatExecutor.modelId,
-          startTime: chatStartMs,
-          timeMs: Date.now() - chatStartMs,
-        });
       }
     } while (doLoop);
+    this.eventProducer.emit(EventName.ChatEnd, {
+      context,
+      messages: lastLlmResponseMessages,
+      modelId: this.chatExecutor.modelId,
+      startTime: chatStartMs,
+      timeMs: Date.now() - chatStartMs,
+    });
     for (const transformer of this.postRunTransformers) {
       responseMessages = await transformer.transform(responseMessages, context);
     }

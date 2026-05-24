@@ -336,10 +336,7 @@ describe("AiChatAgent", () => {
       ]);
     });
 
-    it("fires tool events but not ChatEnd on a returnDirect short-circuit", async () => {
-      // Documents current behavior: when a tool sets returnDirect=true the
-      // agent breaks out of the loop without emitting ChatEnd. If that ever
-      // changes, this assertion will need to be updated alongside it.
+    it("still emits ChatEnd on a returnDirect short-circuit", async () => {
       const producer = new EventProducer();
       const ordered = recordAllEvents(producer);
       const localAgent = new AiChatAgent({
@@ -351,9 +348,18 @@ describe("AiChatAgent", () => {
         messages: [{ role: "user", content: "ping" }],
         tools: [new PingPongTool()],
       });
-      expect(ordered).toContain(EventName.ToolStart);
-      expect(ordered).toContain(EventName.ToolEnd);
-      expect(ordered).not.toContain(EventName.ChatEnd);
+      expect(ordered).toEqual([
+        EventName.ChatStart,
+        EventName.ChatExecutorStart,
+        EventName.ChatRawRequest,
+        EventName.ChatRawResponse,
+        EventName.ChatExecutorEnd,
+        EventName.ToolsStart,
+        EventName.ToolStart,
+        EventName.ToolEnd,
+        EventName.ToolsEnd,
+        EventName.ChatEnd,
+      ]);
     });
   });
 });
