@@ -29,7 +29,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
   public modelProvider: string;
   public modelId: string;
   constructor(private options: OpenAiChatExecutorOptions) {
-    this.options.modelId ??= "gpt-4o";
+    this.options.modelId ??= "o4-mini";
     this.modelProvider = options.modelProvider ?? "openai";
     this.modelId = this.options.modelId;
     this.openAiClient =

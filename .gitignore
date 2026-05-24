@@ -2,5 +2,6 @@ dist/
 .env
 node_modules/
 coverage/
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 tmp/
+.claude/
