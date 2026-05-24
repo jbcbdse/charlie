@@ -43,6 +43,12 @@ appEvents.on(EventName.ChatEnd, (data) => {
   console.dir(data.messages, { depth: null });
   console.log(data.modelId, "complete");
 });
+appEvents.on(EventName.ToolProgress, (data) => {
+  console.log(`[progress] ${data.message}`);
+});
+appEvents.on(EventName.Log, (data) => {
+  console.log(`[${data.level}] ${data.message}`, data.meta);
+});
 if (process.env.DD_API_KEY) {
   new LlmSpansApi({
     apiKey: process.env.DD_API_KEY!,

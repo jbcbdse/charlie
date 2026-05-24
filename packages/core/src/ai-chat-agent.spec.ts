@@ -361,5 +361,91 @@ describe("AiChatAgent", () => {
         EventName.ChatEnd,
       ]);
     });
+
+    it("captures ToolProgress and Log events emitted by a tool", async () => {
+      class ProgressEmittingTool extends BaseTool {
+        public name = "ProgressEmittingTool";
+        public description =
+          "A tool that emits ToolProgress and Log events while running";
+        public schema = z.object({});
+        public handler(
+          _params: z.infer<typeof this.schema>,
+          context: import("./types").ChatAgentContext,
+        ): string {
+          context.eventProducer.emit(EventName.Log, {
+            context,
+            level: "info",
+            message: "starting work",
+            meta: { phase: "init" },
+          });
+          context.eventProducer.emit(EventName.ToolProgress, {
+            context,
+            message: "halfway",
+          });
+          context.eventProducer.emit(EventName.Log, {
+            context,
+            level: "debug",
+            message: "finished work",
+            meta: { phase: "done", count: 42 },
+          });
+          return "done";
+        }
+      }
+
+      // Pre-stage a mock that calls the ProgressEmittingTool, then on the
+      // follow-up turn returns a normal assistant message.
+      class ProgressMockExecutor implements ChatExecutor {
+        modelId = "mock-model-id";
+        modelProvider = "mock-model-provider";
+        async execute(
+          input: ChatExecutorInput,
+        ): Promise<ChatAgentGetResponseOutput> {
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "tool") {
+            const msg: ChatMessage = { role: "assistant", content: "done" };
+            return { responseMessage: msg, responseMessages: [msg] };
+          }
+          const msg: ChatMessage = {
+            role: "tool_call",
+            toolCalls: [
+              {
+                function: {
+                  name: "ProgressEmittingTool",
+                  arguments: {},
+                },
+                id: "progress-1",
+                type: "function",
+              },
+            ],
+          };
+          return { responseMessage: msg, responseMessages: [msg] };
+        }
+      }
+
+      const producer = new EventProducer();
+      const progress: EventTypeMap[EventName.ToolProgress][] = [];
+      const logs: EventTypeMap[EventName.Log][] = [];
+      producer.emitter.on(EventName.ToolProgress, (ev) => progress.push(ev));
+      producer.emitter.on(EventName.Log, (ev) => logs.push(ev));
+
+      const localAgent = new AiChatAgent({
+        chatExecutor: new ProgressMockExecutor(),
+        eventProducer: producer,
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "go" }],
+        tools: [new ProgressEmittingTool()],
+      });
+
+      expect(progress.map((p) => p.message)).toEqual(["halfway"]);
+      expect(logs.map((l) => ({ level: l.level, message: l.message }))).toEqual(
+        [
+          { level: "info", message: "starting work" },
+          { level: "debug", message: "finished work" },
+        ],
+      );
+      expect(logs[1].meta).toEqual({ phase: "done", count: 42 });
+    });
   });
 });

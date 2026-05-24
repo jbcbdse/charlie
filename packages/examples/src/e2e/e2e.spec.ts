@@ -11,11 +11,19 @@ interface ChatMessage {
   toolCalls?: unknown[];
 }
 
+interface CapturedEvent {
+  name: "tool:progress" | "log";
+  message: string;
+  level?: "error" | "warn" | "info" | "debug" | "verbose";
+  meta?: Record<string, unknown>;
+}
+
 interface ChatResponse {
   response: string;
   agent: string;
   messages: ChatMessage[];
   usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+  events?: CapturedEvent[];
 }
 
 async function chat(body: {
@@ -133,6 +141,32 @@ describe("Tool Calling", () => {
       agent: "claude",
     });
     expect(data.response).toMatch(/\b2\b/);
+  });
+
+  test("CountLettersTool — emits ToolProgress and Log events", async () => {
+    const { data } = await chat({
+      message: "How many L's are in the word 'hello'?",
+      agent: "claude",
+    });
+    const events = data.events ?? [];
+    const progress = events.filter((e) => e.name === "tool:progress");
+    const logs = events.filter((e) => e.name === "log");
+
+    expect(progress.length).toBeGreaterThanOrEqual(2);
+    expect(progress.map((p) => p.message)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Scanning"),
+        expect.stringContaining("Found"),
+      ]),
+    );
+
+    expect(logs.length).toBeGreaterThanOrEqual(2);
+    expect(logs.map((l) => l.level)).toEqual(
+      expect.arrayContaining(["info", "debug"]),
+    );
+    const finishedLog = logs.find((l) => l.message.includes("finished"));
+    expect(finishedLog).toBeDefined();
+    expect(finishedLog?.meta).toMatchObject({ word: "hello", letter: "l" });
   });
 
   test("CurrentTimeTool — returns a time value", async () => {

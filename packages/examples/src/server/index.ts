@@ -145,7 +145,7 @@ const app = express();
 app.use(express.json());
 
 app.get("/agents", agentsHandler(availableAgents));
-app.post("/chat", chatHandler(agents, availableAgents, tools));
+app.post("/chat", chatHandler(agents, availableAgents, tools, appEvents));
 
 const PORT = process.env.PORT || 3456;
 app.listen(PORT, () => {
