@@ -32,13 +32,14 @@ export class AiChatAgent implements ChatAgent {
     preToolCallTransformers?: ChatMessageTransformer[];
     postToolCallTransformers?: ChatMessageTransformer[];
     postRunTransformers?: ChatMessageTransformer[];
+    eventProducer?: EventProducer;
   }) {
     this.chatExecutor = options.chatExecutor;
     this.toolExecutor = options.toolExecutor || new ToolExecutor();
     this.preToolCallTransformers = options.preToolCallTransformers || [];
     this.postToolCallTransformers = options.postToolCallTransformers || [];
     this.postRunTransformers = options.postRunTransformers || [];
-    this.eventProducer = eventProducer;
+    this.eventProducer = options.eventProducer ?? eventProducer;
     this.systemPromptTemplate = options.systemPromptTemplate;
     this.templateSerializer =
       options.templateSerializer || new TemplateSerializer();
@@ -55,6 +56,7 @@ export class AiChatAgent implements ChatAgent {
       modelId: this.chatExecutor.modelId,
       messages,
       meta,
+      eventProducer: this.eventProducer,
     };
     context.runId = newRunId();
     context.modelId = this.chatExecutor.modelId;

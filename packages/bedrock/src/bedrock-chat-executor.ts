@@ -11,8 +11,6 @@ import {
   ChatMessage,
   ChatExecutorInput,
   EventName,
-  eventProducer,
-  EventProducer,
 } from "@jbcbdse/charlie-core";
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
@@ -25,7 +23,6 @@ export class BedrockChatExecutor implements ChatExecutor {
   private client: BedrockRuntime;
   private toolPromptGenerator: ToolPromptGenerator;
   private messageConverter: MessageConverter;
-  private eventProducer: EventProducer;
   private toolsSupported: boolean;
 
   constructor(options: {
@@ -48,7 +45,6 @@ export class BedrockChatExecutor implements ChatExecutor {
     toolParser?: InlineToolCallParser;
     toolPromptGenerator?: ToolPromptGenerator;
     messageConverter?: MessageConverter;
-    eventProducer?: EventProducer;
   }) {
     this.client =
       options.client ||
@@ -66,7 +62,6 @@ export class BedrockChatExecutor implements ChatExecutor {
       new MessageConverter({
         toolsSupported: this.toolsSupported,
       });
-    this.eventProducer = options.eventProducer || eventProducer;
   }
 
   public async execute({
@@ -101,7 +96,8 @@ export class BedrockChatExecutor implements ChatExecutor {
       this.messageConverter.toBedrockMessages(remainingMessages);
     const toolConfig = {
       tools:
-        tools && tools.map((tool) => ({
+        tools &&
+        tools.map((tool) => ({
           toolSpec: {
             inputSchema: {
               json: tool.jsonSchema,
@@ -123,13 +119,13 @@ export class BedrockChatExecutor implements ChatExecutor {
           : undefined,
     };
     const chatExecutorStartMs = Date.now();
-    this.eventProducer.emit(EventName.ChatRawRequest, {
+    context.eventProducer.emit(EventName.ChatRawRequest, {
       context,
       request,
       modelId: this.modelId,
     });
     const response = await this.client.converse(request);
-    this.eventProducer.emit(EventName.ChatRawResponse, {
+    context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       response: response,
       modelId: this.modelId,

@@ -7,6 +7,7 @@ These types should be suitable for storing history with a clear idea of what hap
 */
 
 import type { ITool } from "./base-tool";
+import type { EventProducer } from "./event-producer";
 
 /**
  * A system message in the chat
@@ -104,6 +105,7 @@ export interface ChatAgentContext {
   modelId: string;
   messages: ChatMessage[];
   meta: ChatAgentContentMeta;
+  eventProducer: EventProducer;
 }
 export interface ChatAgentGetResponseInput {
   messages: ChatMessage[];

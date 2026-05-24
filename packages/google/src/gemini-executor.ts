@@ -2,7 +2,6 @@ import {
   ChatExecutor,
   ChatExecutorInput,
   EventName,
-  eventProducer,
   ChatAgentGetResponseOutput,
 } from "@jbcbdse/charlie-core";
 import {
@@ -43,13 +42,13 @@ export class GeminiExecutor implements ChatExecutor {
       systemInstruction: systemPrompt,
     };
     const startMs = Date.now();
-    eventProducer.emit(EventName.ChatRawRequest, {
+    context.eventProducer.emit(EventName.ChatRawRequest, {
       context,
       modelId: this.modelId,
       request: req,
     });
     const response = await this.model.generateContent(req);
-    eventProducer.emit(EventName.ChatRawResponse, {
+    context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       modelId: this.modelId,
       response,
