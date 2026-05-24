@@ -1,6 +1,11 @@
 /* eslint-disable no-console */
 import { Request, Response } from "express";
-import { ChatAgent, ChatMessage, ITool, MessageUser } from "@jbcbdse/charlie-core";
+import {
+  ChatAgent,
+  ChatMessage,
+  ITool,
+  MessageUser,
+} from "@jbcbdse/charlie-core";
 import { AvailableAgent } from "./agents";
 
 interface ChatRequest {
@@ -16,14 +21,21 @@ export function chatHandler(
   tools: ITool[],
 ) {
   return async (req: Request, res: Response) => {
-    const { message, agent = "claude", messages = [], user = {} }: ChatRequest = req.body;
+    const {
+      message,
+      agent = "claude",
+      messages = [],
+      user = {},
+    }: ChatRequest = req.body;
 
     if (!message) {
       res.status(400).json({ error: "message is required" });
       return;
     }
     if (!availableAgents.includes(agent)) {
-      res.status(400).json({ error: `unknown agent: ${agent}. Available: ${availableAgents.join(", ")}` });
+      res.status(400).json({
+        error: `unknown agent: ${agent}. Available: ${availableAgents.join(", ")}`,
+      });
       return;
     }
 
@@ -35,7 +47,12 @@ export function chatHandler(
         messages: history,
         tools,
         meta: {
-          user: { first_name: "Jonathan", last_name: "Barnett", preferred_name: "Jon", ...user },
+          user: {
+            first_name: "Jonathan",
+            last_name: "Barnett",
+            preferred_name: "Jon",
+            ...user,
+          },
           availableAgents,
         },
       });

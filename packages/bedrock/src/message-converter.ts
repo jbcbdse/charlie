@@ -40,15 +40,15 @@ export class MessageConverter {
           (call): ContentBlock =>
             this.toolsSupported
               ? {
-                toolUse: {
-                  toolUseId: call.id,
-                  name: call.function.name,
-                  input: call.function.arguments as DocumentType,
-                },
-              }
+                  toolUse: {
+                    toolUseId: call.id,
+                    name: call.function.name,
+                    input: call.function.arguments as DocumentType,
+                  },
+                }
               : {
-                text: `Tool call:\n${JSON.stringify([{ name: call.function.name, arguments: call.function.arguments }])}`,
-              },
+                  text: `Tool call:\n${JSON.stringify([{ name: call.function.name, arguments: call.function.arguments }])}`,
+                },
         ),
       };
     }

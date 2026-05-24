@@ -36,13 +36,12 @@ async function chat(body: {
   return { status: res.status, data };
 }
 
-async function assertJudge(
-  response: string,
-  criteria: string,
-): Promise<void> {
+async function assertJudge(response: string, criteria: string): Promise<void> {
   const result = await judge(response, criteria);
   if (!result.pass) {
-    throw new Error(`LLM judge failed — ${result.reason}\n\nResponse was:\n${response}`);
+    throw new Error(
+      `LLM judge failed — ${result.reason}\n\nResponse was:\n${response}`,
+    );
   }
 }
 
@@ -61,22 +60,34 @@ describe("Per-Module Response", () => {
   const CRITERIA = "The response is a greeting from an AI assistant";
 
   test("charlie-bedrock via claude", async () => {
-    const { data } = await chat({ message: "Say hello and tell me your name", agent: "claude" });
+    const { data } = await chat({
+      message: "Say hello and tell me your name",
+      agent: "claude",
+    });
     await assertJudge(data.response, CRITERIA);
   });
 
   test("charlie-openai via gpt4o", async () => {
-    const { data } = await chat({ message: "Say hello and tell me your name", agent: "gpt4o" });
+    const { data } = await chat({
+      message: "Say hello and tell me your name",
+      agent: "gpt4o",
+    });
     await assertJudge(data.response, CRITERIA);
   });
 
   test("charlie-google via gemini", async () => {
-    const { data } = await chat({ message: "Say hello and tell me your name", agent: "gemini" });
+    const { data } = await chat({
+      message: "Say hello and tell me your name",
+      agent: "gemini",
+    });
     await assertJudge(data.response, CRITERIA);
   });
 
   test("charlie-openai via GrokExecutor (grok)", async () => {
-    const { data } = await chat({ message: "Say hello and tell me your name", agent: "grok" });
+    const { data } = await chat({
+      message: "Say hello and tell me your name",
+      agent: "grok",
+    });
     await assertJudge(data.response, CRITERIA);
   });
 });
@@ -109,7 +120,10 @@ describe("Bedrock Model Smoke Tests", () => {
 // ---------------------------------------------------------------------------
 describe("Tool Calling", () => {
   test("CalculatorTool — computes result and returns 105", async () => {
-    const { data } = await chat({ message: "What is 15 multiplied by 7?", agent: "claude" });
+    const { data } = await chat({
+      message: "What is 15 multiplied by 7?",
+      agent: "claude",
+    });
     expect(data.response).toContain("105");
   });
 
@@ -126,7 +140,10 @@ describe("Tool Calling", () => {
       message: "What time is it right now?",
       agent: "claude",
     });
-    await assertJudge(data.response, "The response mentions a specific time or date");
+    await assertJudge(
+      data.response,
+      "The response mentions a specific time or date",
+    );
   });
 
   test("DirectBirthdayTool — returnDirect stops the agent loop", async () => {
@@ -138,7 +155,10 @@ describe("Tool Calling", () => {
     const toolIdx = data.messages.map((m) => m.role).lastIndexOf("tool");
     const afterTool = data.messages.slice(toolIdx + 1);
     expect(afterTool.some((m) => m.role === "tool_call")).toBe(false);
-    await assertJudge(data.response, "The response confirms a birthday was set");
+    await assertJudge(
+      data.response,
+      "The response confirms a birthday was set",
+    );
   });
 
   test("DeleteAccountTool — asks for confirmation when not certain", async () => {
@@ -162,7 +182,10 @@ describe("Tool Calling", () => {
       agent: "claude",
       messages: turn1.data.messages,
     });
-    await assertJudge(data.response, "The response confirms the account has been deleted");
+    await assertJudge(
+      data.response,
+      "The response confirms the account has been deleted",
+    );
   });
 
   test("CalculatorTool via Titan (InlineToolCallParser)", async () => {

@@ -11,7 +11,7 @@ export async function judge(
 ): Promise<JudgeResult> {
   const message = [
     "YOUR TASK: Evaluate a response against criteria.",
-    'Return ONLY a JSON object — no explanation, no emoji, no surrounding text.',
+    "Return ONLY a JSON object — no explanation, no emoji, no surrounding text.",
     'Format: {"pass": true, "reason": "..."} or {"pass": false, "reason": "..."}',
     "",
     `Criteria: ${criteria}`,
@@ -55,5 +55,8 @@ function parseJudgeResponse(text: string): JudgeResult {
     };
   }
 
-  return { pass: false, reason: `Could not parse judge response: ${text.slice(0, 200)}` };
+  return {
+    pass: false,
+    reason: `Could not parse judge response: ${text.slice(0, 200)}`,
+  };
 }
