@@ -6,8 +6,6 @@ This guide covers how the repo is structured, what makes it unusual, and how to 
 
 Charlie is a TypeScript monorepo that provides a thin, stateless layer for calling chat LLMs through a unified interface. The core abstraction is `ChatExecutor` (one per provider) composed into `AiChatAgent` (provider-agnostic). The caller owns message history; the agent owns one round-trip.
 
-This repo (`jbcbdse/charlie`) is a personal fork of a private upstream (`ifit/charlie`). Both publish the same packages under different npm scopes: `@jbcbdse` here, `@ifit` upstream. Syncing is done manually via `git merge fork/master` followed by a rebrand commit — see the git log for the pattern.
-
 ## Package map
 
 ```
@@ -84,19 +82,3 @@ Copy `.env.example` to `.env` and fill in keys. AWS credentials must have Bedroc
 
 Some Bedrock models don't support the Converse API's tool-calling feature. Set `toolsSupported: false` on `BedrockChatExecutor` and add `InlineToolCallParser` to `preToolCallTransformers`. The parser reads JSON tool calls embedded in the model's plain-text response and converts them into the standard `MessageToolCall` format. The `titan` agent in examples exercises this path.
 
-## Fork sync workflow
-
-When pulling new commits from `ifit/charlie`:
-
-```bash
-git remote add fork /path/to/ifit/charlie   # or the GitHub URL
-git fetch fork
-git checkout -b sync-from-fork
-git merge fork/master --no-ff
-# then one rebrand commit:
-find . -type f \( -name "*.ts" -o -name "*.json" -o -name "*.md" \) \
-  ! -path "*/node_modules/*" ! -name "package-lock.json" \
-  -exec sed -i 's|@ifit/|@jbcbdse/|g; s|github.com/ifit/charlie|github.com/jbcbdse/charlie|g; s|"author": "iFIT"|"author": "Jonathan Barnett"|g' {} +
-npm install   # regenerate lock file
-git commit -am "chore: Rebrand ifit references to jbcbdse"
-```
