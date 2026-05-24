@@ -74,6 +74,16 @@ export interface EventChatRawResponse extends ChatEndEvent {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   response: any;
 }
+export interface EventToolProgress extends ChatEvent {
+  message: string;
+}
+export type LogLevel = "error" | "warn" | "info" | "debug" | "verbose";
+export interface EventLog extends ChatEvent {
+  message: string;
+  level: LogLevel;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  meta: Record<string, any>;
+}
 
 /**
  * Events that can be emitted by the event producer and can be subscribed to by the event subscriber
@@ -99,6 +109,10 @@ export enum EventName {
   ChatRawRequest = "chat:raw:request",
   /** Emitted by a chat executor to show the raw API response. Shape will vary by executor */
   ChatRawResponse = "chat:raw:response",
+  /** Emitted by a tool while it is running to surface progress updates to subscribers */
+  ToolProgress = "tool:progress",
+  /** General-purpose structured log line emitted from anywhere with access to the context */
+  Log = "log",
 }
 /**
  * Map of event names to event types
@@ -134,6 +148,8 @@ export interface EventTypeMap {
   [EventName.ChatExecutorEnd]: EventChatExecutorEnd;
   [EventName.ChatRawRequest]: EventChatRawRequest;
   [EventName.ChatRawResponse]: EventChatRawResponse;
+  [EventName.ToolProgress]: EventToolProgress;
+  [EventName.Log]: EventLog;
 }
 
 export class EventProducer {
