@@ -5,9 +5,10 @@ import {
   ChatAgent,
   ChatMessage,
   EventName,
+  EventProducer,
+  EventSubscriber,
   MessageUser,
   ToolAssistantFilter,
-  events,
 } from "@jbcbdse/charlie-core";
 import {
   BedrockChatExecutor,
@@ -26,18 +27,27 @@ import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
 import { DeleteAccountTool } from "../tools/delete-account.tool";
 dotenv.config({ path: "../../.env" });
 
-events.on(EventName.ToolStart, (data) => {
+const appEventProducer = new EventProducer();
+const appEvents = new EventSubscriber(appEventProducer);
+
+appEvents.on(EventName.ToolStart, (data) => {
   // console.debug(EventName.ChatRawRequest, JSON.stringify(data, null, 2));
   console.dir(data.toolCall.toolCalls, { depth: null });
 });
-events.on(EventName.ToolsEnd, (data) => {
+appEvents.on(EventName.ToolsEnd, (data) => {
   data.toolMessages.forEach((toolMessage, index) => {
     console.log(`[Tool result ${index + 1}] ${toolMessage.content}`);
   });
 });
-events.on(EventName.ChatEnd, (data) => {
+appEvents.on(EventName.ChatEnd, (data) => {
   console.dir(data.messages, { depth: null });
   console.log(data.modelId, "complete");
+});
+appEvents.on(EventName.ToolProgress, (data) => {
+  console.log(`[progress] ${data.message}`);
+});
+appEvents.on(EventName.Log, (data) => {
+  console.log(`[${data.level}] ${data.message}`, data.meta);
 });
 if (process.env.DD_API_KEY) {
   new LlmSpansApi({
@@ -46,7 +56,7 @@ if (process.env.DD_API_KEY) {
       service: "charlie",
       env: "dev",
     },
-  }).listen(events);
+  }).listen(appEvents);
 }
 // events.on(EventName.ChatRawResponse, (data) => {
 //   // console.debug(EventName.ChatRawResponse, JSON.stringify(data, null, 2));
@@ -79,6 +89,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
+    eventProducer: appEventProducer,
   }),
   mistral: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -86,6 +97,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
+    eventProducer: appEventProducer,
   }),
   commandr: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -93,6 +105,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
+    eventProducer: appEventProducer,
   }),
   llama: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -100,6 +113,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
+    eventProducer: appEventProducer,
   }),
   "jamba-large": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -107,6 +121,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
+    eventProducer: appEventProducer,
   }),
   nova: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -114,6 +129,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [toolAssistantFilter],
+    eventProducer: appEventProducer,
   }),
   titan: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -122,6 +138,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     preToolCallTransformers: [inlineToolCallParser, toolAssistantFilter],
+    eventProducer: appEventProducer,
   }),
   gpt4o: new AiChatAgent({
     chatExecutor: new OpenAiChatExecutor({
@@ -129,6 +146,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
       apiKey: process.env.OPENAI_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
   }),
   grok: new AiChatAgent({
     chatExecutor: new GrokExecutor({
@@ -136,6 +154,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
       apiKey: process.env.XAI_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
   }),
   gemini: new AiChatAgent({
     chatExecutor: new GeminiExecutor({
@@ -143,6 +162,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
       apiKey: process.env.GOOGLE_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
   }),
 };
 const tools = [

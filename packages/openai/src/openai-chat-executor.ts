@@ -7,8 +7,6 @@ import {
   ChatExecutorInput,
   TemplateSerializer,
   EventName,
-  eventProducer,
-  EventProducer,
 } from "@jbcbdse/charlie-core";
 
 export interface OpenAiChatExecutorOptions {
@@ -19,13 +17,11 @@ export interface OpenAiChatExecutorOptions {
   apiKey?: string;
   baseURL?: string;
   dangerouslyAllowBrowser?: boolean;
-  eventProducer?: EventProducer;
   maxRetries?: number;
   timeout?: number;
 }
 export class OpenAiChatExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
-  private eventProducer: EventProducer;
   public modelProvider: string;
   public modelId: string;
   constructor(private options: OpenAiChatExecutorOptions) {
@@ -41,19 +37,17 @@ export class OpenAiChatExecutor implements ChatExecutor {
         maxRetries: options.maxRetries || undefined,
         timeout: options.timeout || undefined,
       });
-    this.eventProducer = options.eventProducer ?? eventProducer;
   }
   public async execute({
     messages,
     tools,
-    systemPrompt,
     context,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const openAiMessages = this.toOpenAiMessages(messages);
-    if (systemPrompt) {
+    if (context.systemPrompt) {
       openAiMessages.unshift({
         role: "system",
-        content: systemPrompt,
+        content: context.systemPrompt,
       });
     }
     const request: OpenAiCompletionsRequest = {
@@ -71,13 +65,13 @@ export class OpenAiChatExecutor implements ChatExecutor {
         })),
     };
     const chatExecutorStartMs = Date.now();
-    this.eventProducer.emit(EventName.ChatRawRequest, {
+    context.eventProducer.emit(EventName.ChatRawRequest, {
       context,
       request,
       modelId: this.modelId,
     });
     const data = await this.openAiClient.chat.completions.create(request);
-    this.eventProducer.emit(EventName.ChatRawResponse, {
+    context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       response: data,
       modelId: this.modelId,

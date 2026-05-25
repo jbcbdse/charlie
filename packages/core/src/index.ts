@@ -31,4 +31,7 @@ export {
   EventChatStart,
   EventChatExecutorEnd,
   EventToolEnd,
+  EventToolProgress,
+  EventLog,
+  LogLevel,
 } from "./event-producer";

@@ -50,13 +50,13 @@ interface Metrics {
 }
 interface Meta {
   kind:
-  | "agent"
-  | "workflow"
-  | "llm"
-  | "tool"
-  | "task"
-  | "embedding"
-  | "retrieval";
+    | "agent"
+    | "workflow"
+    | "llm"
+    | "tool"
+    | "task"
+    | "embedding"
+    | "retrieval";
   error?: DDError;
   input: IO;
   output: IO;
@@ -194,6 +194,7 @@ export class LlmSpansApi {
         {},
       )
       .catch((err) => {
+        // eslint-disable-next-line no-console
         console.error("Failed to send spans to Datadog", {
           error: err,
           requestErrors: err.response.data.errors,

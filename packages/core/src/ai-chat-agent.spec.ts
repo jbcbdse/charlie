@@ -4,9 +4,17 @@ import {
   ChatAgentGetResponseInput,
   ChatAgentGetResponseOutput,
   ChatExecutor,
+  ChatExecutorInput,
   ChatMessage,
   MessageAssistant,
 } from "./types";
+import {
+  EventName,
+  EventProducer,
+  EventTypeMap,
+  eventProducer as globalEventProducer,
+} from "./event-producer";
+import { EventSubscriber } from "./event-subscriber";
 import { z } from "zod";
 
 class CalculatorTool extends BaseTool {
@@ -138,6 +146,451 @@ describe("AiChatAgent", () => {
       expect(responseMessage.role).toBe("assistant");
       expect(responseMessage.content).toBe("pong");
       expect(response.responseMessages).toMatchSnapshot();
+    });
+  });
+
+  describe("eventProducer injection", () => {
+    // MockExecutor that also emits ChatRawRequest / ChatRawResponse via the
+    // context-supplied producer, so we can validate executor-side wiring end
+    // to end without depending on a real LLM SDK.
+    class RawEmittingMockExecutor implements ChatExecutor {
+      modelId = "mock-model-id";
+      modelProvider = "mock-model-provider";
+      public capturedContexts: ChatExecutorInput["context"][] = [];
+      execute = jest.fn(
+        async (
+          input: ChatExecutorInput,
+        ): Promise<ChatAgentGetResponseOutput> => {
+          this.capturedContexts.push(input.context);
+          input.context.eventProducer.emit(EventName.ChatRawRequest, {
+            context: input.context,
+            modelId: this.modelId,
+            request: { fake: "request" },
+          });
+          const last = input.messages[input.messages.length - 1];
+          let responseMessage: ChatMessage = {
+            role: "assistant",
+            content: "Hello",
+          };
+          if (last.role === "user" && last.content === "Calculate 3 + 4") {
+            responseMessage = {
+              role: "tool_call",
+              toolCalls: [
+                {
+                  function: {
+                    name: "CalculatorTool",
+                    arguments: { expr: "3 + 4" },
+                  },
+                  id: "toolcall1",
+                  type: "function",
+                },
+              ],
+            };
+          } else if (last.role === "user" && /ping/i.test(last.content)) {
+            responseMessage = {
+              role: "tool_call",
+              toolCalls: [
+                {
+                  function: { name: "PingPongTool", arguments: {} },
+                  id: "toolcall2",
+                  type: "function",
+                },
+              ],
+            };
+          } else if (last.role === "user") {
+            responseMessage = {
+              role: "assistant",
+              content: `You said: ${last.content}`,
+            };
+          } else if (last.role === "tool") {
+            responseMessage = {
+              role: "assistant",
+              content: `The ${last.name} tool said: ${last.content}`,
+            };
+          }
+          input.context.eventProducer.emit(EventName.ChatRawResponse, {
+            context: input.context,
+            modelId: this.modelId,
+            response: { fake: "response" },
+            timeMs: 0,
+          });
+          return {
+            responseMessage,
+            responseMessages: [responseMessage],
+          };
+        },
+      );
+    }
+
+    function recordAllEvents(producer: EventProducer): string[] {
+      const seen: string[] = [];
+      for (const name of Object.values(EventName)) {
+        producer.emitter.on(name, () => seen.push(name));
+      }
+      return seen;
+    }
+
+    let globalBaseline: Record<string, number>;
+
+    beforeEach(() => {
+      globalBaseline = Object.fromEntries(
+        Object.values(EventName).map((n) => [
+          n,
+          globalEventProducer.emitter.listenerCount(n),
+        ]),
+      );
+    });
+
+    it("defaults to the global eventProducer when none is passed", async () => {
+      const subscriber = new EventSubscriber();
+      const heard: EventTypeMap[EventName.ChatStart][] = [];
+      const listener = (ev: EventTypeMap[EventName.ChatStart]): void => {
+        heard.push(ev);
+      };
+      subscriber.on(EventName.ChatStart, listener);
+      try {
+        const localAgent = new AiChatAgent({
+          chatExecutor: new RawEmittingMockExecutor(),
+        });
+        await localAgent.getResponse({
+          meta: {},
+          messages: [{ role: "user", content: "Hey buddy" }],
+        });
+        expect(heard).toHaveLength(1);
+      } finally {
+        subscriber.off(EventName.ChatStart, listener);
+      }
+    });
+
+    it("routes all agent-emitted events to the injected producer only", async () => {
+      const producer = new EventProducer();
+      const injected = recordAllEvents(producer);
+      const localAgent = new AiChatAgent({
+        chatExecutor: new RawEmittingMockExecutor(),
+        eventProducer: producer,
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "Hey buddy" }],
+      });
+      // No tool path → ChatStart, ChatExecutorStart, ChatRawRequest,
+      // ChatRawResponse, ChatExecutorEnd, ChatEnd.
+      expect(injected).toEqual([
+        EventName.ChatStart,
+        EventName.ChatExecutorStart,
+        EventName.ChatRawRequest,
+        EventName.ChatRawResponse,
+        EventName.ChatExecutorEnd,
+        EventName.ChatEnd,
+      ]);
+      // Global listener counts unchanged → no cross-pollution.
+      for (const n of Object.values(EventName)) {
+        expect(globalEventProducer.emitter.listenerCount(n)).toBe(
+          globalBaseline[n],
+        );
+      }
+    });
+
+    it("attaches the injected producer to ChatAgentContext", async () => {
+      const producer = new EventProducer();
+      const executor = new RawEmittingMockExecutor();
+      const localAgent = new AiChatAgent({
+        chatExecutor: executor,
+        eventProducer: producer,
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "Hey buddy" }],
+      });
+      expect(executor.capturedContexts).toHaveLength(1);
+      expect(executor.capturedContexts[0].eventProducer).toBe(producer);
+    });
+
+    it("emits the full ordered event sequence for a tool-calling flow", async () => {
+      const producer = new EventProducer();
+      const ordered = recordAllEvents(producer);
+      const localAgent = new AiChatAgent({
+        chatExecutor: new RawEmittingMockExecutor(),
+        eventProducer: producer,
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "Calculate 3 + 4" }],
+        tools: [new CalculatorTool()],
+      });
+      expect(ordered).toEqual([
+        EventName.ChatStart,
+        EventName.ChatExecutorStart,
+        EventName.ChatRawRequest,
+        EventName.ChatRawResponse,
+        EventName.ChatExecutorEnd,
+        EventName.ToolsStart,
+        EventName.ToolStart,
+        EventName.ToolEnd,
+        EventName.ToolsEnd,
+        EventName.ChatExecutorStart,
+        EventName.ChatRawRequest,
+        EventName.ChatRawResponse,
+        EventName.ChatExecutorEnd,
+        EventName.ChatEnd,
+      ]);
+    });
+
+    it("still emits ChatEnd on a returnDirect short-circuit", async () => {
+      const producer = new EventProducer();
+      const ordered = recordAllEvents(producer);
+      const localAgent = new AiChatAgent({
+        chatExecutor: new RawEmittingMockExecutor(),
+        eventProducer: producer,
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "ping" }],
+        tools: [new PingPongTool()],
+      });
+      expect(ordered).toEqual([
+        EventName.ChatStart,
+        EventName.ChatExecutorStart,
+        EventName.ChatRawRequest,
+        EventName.ChatRawResponse,
+        EventName.ChatExecutorEnd,
+        EventName.ToolsStart,
+        EventName.ToolStart,
+        EventName.ToolEnd,
+        EventName.ToolsEnd,
+        EventName.ChatEnd,
+      ]);
+    });
+
+    it("captures ToolProgress and Log events emitted by a tool", async () => {
+      class ProgressEmittingTool extends BaseTool {
+        public name = "ProgressEmittingTool";
+        public description =
+          "A tool that emits ToolProgress and Log events while running";
+        public schema = z.object({});
+        public handler(
+          _params: z.infer<typeof this.schema>,
+          context: import("./types").ChatAgentContext,
+        ): string {
+          context.eventProducer.emit(EventName.Log, {
+            context,
+            level: "info",
+            message: "starting work",
+            meta: { phase: "init" },
+          });
+          context.eventProducer.emit(EventName.ToolProgress, {
+            context,
+            message: "halfway",
+          });
+          context.eventProducer.emit(EventName.Log, {
+            context,
+            level: "debug",
+            message: "finished work",
+            meta: { phase: "done", count: 42 },
+          });
+          return "done";
+        }
+      }
+
+      // Pre-stage a mock that calls the ProgressEmittingTool, then on the
+      // follow-up turn returns a normal assistant message.
+      class ProgressMockExecutor implements ChatExecutor {
+        modelId = "mock-model-id";
+        modelProvider = "mock-model-provider";
+        async execute(
+          input: ChatExecutorInput,
+        ): Promise<ChatAgentGetResponseOutput> {
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "tool") {
+            const msg: ChatMessage = { role: "assistant", content: "done" };
+            return { responseMessage: msg, responseMessages: [msg] };
+          }
+          const msg: ChatMessage = {
+            role: "tool_call",
+            toolCalls: [
+              {
+                function: {
+                  name: "ProgressEmittingTool",
+                  arguments: {},
+                },
+                id: "progress-1",
+                type: "function",
+              },
+            ],
+          };
+          return { responseMessage: msg, responseMessages: [msg] };
+        }
+      }
+
+      const producer = new EventProducer();
+      const progress: EventTypeMap[EventName.ToolProgress][] = [];
+      const logs: EventTypeMap[EventName.Log][] = [];
+      producer.emitter.on(EventName.ToolProgress, (ev) => progress.push(ev));
+      producer.emitter.on(EventName.Log, (ev) => logs.push(ev));
+
+      const localAgent = new AiChatAgent({
+        chatExecutor: new ProgressMockExecutor(),
+        eventProducer: producer,
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "go" }],
+        tools: [new ProgressEmittingTool()],
+      });
+
+      expect(progress.map((p) => p.message)).toEqual(["halfway"]);
+      expect(logs.map((l) => ({ level: l.level, message: l.message }))).toEqual(
+        [
+          { level: "info", message: "starting work" },
+          { level: "debug", message: "finished work" },
+        ],
+      );
+      expect(logs[1].meta).toEqual({ phase: "done", count: 42 });
+    });
+  });
+
+  describe("systemPrompt on context", () => {
+    // Capturing mock: records what context.systemPrompt looked like on each
+    // executor call, then drives the agent through one tool turn so we can
+    // verify the re-serialization-per-iteration semantics.
+    class CapturingMockExecutor implements ChatExecutor {
+      modelId = "mock-model-id";
+      modelProvider = "mock-model-provider";
+      public seenSystemPrompts: (string | undefined)[] = [];
+      execute = jest.fn(
+        async (
+          input: ChatExecutorInput,
+        ): Promise<ChatAgentGetResponseOutput> => {
+          this.seenSystemPrompts.push(input.context.systemPrompt);
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "tool") {
+            const msg: ChatMessage = {
+              role: "assistant",
+              content: "ok",
+            };
+            return { responseMessage: msg, responseMessages: [msg] };
+          }
+          const msg: ChatMessage = {
+            role: "tool_call",
+            toolCalls: [
+              {
+                function: { name: "BumpCounterTool", arguments: {} },
+                id: "bump-1",
+                type: "function",
+              },
+            ],
+          };
+          return { responseMessage: msg, responseMessages: [msg] };
+        },
+      );
+    }
+
+    class BumpCounterTool extends BaseTool {
+      public name = "BumpCounterTool";
+      public description =
+        "Increments a counter stored in context.meta so the next template " +
+        "serialization picks up a different value.";
+      public schema = z.object({});
+      public handler(
+        _params: z.infer<typeof this.schema>,
+        context: import("./types").ChatAgentContext,
+      ): string {
+        context.meta.counter = ((context.meta.counter as number) || 0) + 1;
+        return "bumped";
+      }
+    }
+
+    it("attaches the serialized system prompt to context on every iteration", async () => {
+      const executor = new CapturingMockExecutor();
+      const localAgent = new AiChatAgent({
+        chatExecutor: executor,
+        systemPromptTemplate: "Counter is {{counter}}",
+      });
+      await localAgent.getResponse({
+        meta: { counter: 7 },
+        messages: [{ role: "user", content: "go" }],
+        tools: [new BumpCounterTool()],
+      });
+      // Two executor calls: initial + post-tool. The counter bumped between
+      // them, so the serialized prompt should differ.
+      expect(executor.seenSystemPrompts).toEqual([
+        expect.stringContaining("Counter is 7"),
+        expect.stringContaining("Counter is 8"),
+      ]);
+    });
+
+    it("leaves context.systemPrompt undefined when no template is configured", async () => {
+      const executor = new CapturingMockExecutor();
+      const localAgent = new AiChatAgent({ chatExecutor: executor });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "go" }],
+        tools: [new BumpCounterTool()],
+      });
+      expect(executor.seenSystemPrompts).toEqual([undefined, undefined]);
+    });
+
+    it("re-serializes the template on the next iteration, reflecting tool template mutations", async () => {
+      // A tool that mutates context.systemPromptTemplate. The next
+      // iteration must serialize the new template, proving that template
+      // mutations are respected.
+      class HijackPromptTool extends BaseTool {
+        public name = "HijackPromptTool";
+        public description = "Overwrites context.systemPromptTemplate mid-run.";
+        public schema = z.object({});
+        public handler(
+          _params: z.infer<typeof this.schema>,
+          context: import("./types").ChatAgentContext,
+        ): string {
+          context.systemPromptTemplate = "HIJACKED";
+          return "hijacked";
+        }
+      }
+      class HijackMockExecutor implements ChatExecutor {
+        modelId = "mock-model-id";
+        modelProvider = "mock-model-provider";
+        public seen: (string | undefined)[] = [];
+        async execute(
+          input: ChatExecutorInput,
+        ): Promise<ChatAgentGetResponseOutput> {
+          this.seen.push(input.context.systemPrompt);
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "tool") {
+            const msg: ChatMessage = {
+              role: "assistant",
+              content: "done",
+            };
+            return { responseMessage: msg, responseMessages: [msg] };
+          }
+          const msg: ChatMessage = {
+            role: "tool_call",
+            toolCalls: [
+              {
+                function: { name: "HijackPromptTool", arguments: {} },
+                id: "hi-1",
+                type: "function",
+              },
+            ],
+          };
+          return { responseMessage: msg, responseMessages: [msg] };
+        }
+      }
+      const executor = new HijackMockExecutor();
+      const localAgent = new AiChatAgent({
+        chatExecutor: executor,
+        systemPromptTemplate: "Template prompt",
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "go" }],
+        tools: [new HijackPromptTool()],
+      });
+      expect(executor.seen).toEqual([
+        expect.stringContaining("Template prompt"),
+        expect.stringContaining("HIJACKED"),
+      ]);
+      // The second iteration should use the hijacked template.
+      expect(executor.seen[1]).toBe("HIJACKED");
     });
   });
 });

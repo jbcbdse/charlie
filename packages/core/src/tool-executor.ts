@@ -1,15 +1,11 @@
 import { ITool } from "./base-tool";
-import { EventName, eventProducer, EventProducer } from "./event-producer";
+import { EventName } from "./event-producer";
 import { ChatAgentContext, MessageTool, MessageToolCall } from "./types";
 
 /**
  * All Agents should use this class to execute tools
  */
 export class ToolExecutor {
-  private eventProducer: EventProducer;
-  constructor() {
-    this.eventProducer = eventProducer;
-  }
   /**
    * Give a tool call message, which may contain multiple tool calls, execute each tool call and return the results
    */
@@ -32,7 +28,7 @@ export class ToolExecutor {
           };
         }
         const toolStartMs = Date.now();
-        this.eventProducer.emit(EventName.ToolStart, {
+        context.eventProducer.emit(EventName.ToolStart, {
           context,
           startTime: toolStartMs,
           toolCall: toolCallMessage,
@@ -56,7 +52,7 @@ export class ToolExecutor {
             status: "error" as const,
             returnDirect: false,
           }));
-        this.eventProducer.emit(EventName.ToolEnd, {
+        context.eventProducer.emit(EventName.ToolEnd, {
           context,
           startTime: toolStartMs,
           timeMs: Date.now() - toolStartMs,
