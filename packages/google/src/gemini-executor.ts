@@ -35,11 +35,11 @@ export class GeminiExecutor implements ChatExecutor {
   public async execute(
     input: ChatExecutorInput,
   ): Promise<ChatAgentGetResponseOutput> {
-    const { context, messages, systemPrompt, tools } = input;
+    const { context, messages, tools } = input;
     const req: GenerateContentRequest = {
       contents: this.messageConverter.toContentObjects(messages),
       tools: tools ? await this.toolConverter.toGeminiTools(tools) : [],
-      systemInstruction: systemPrompt,
+      systemInstruction: context.systemPrompt,
     };
     const startMs = Date.now();
     context.eventProducer.emit(EventName.ChatRawRequest, {

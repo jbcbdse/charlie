@@ -58,6 +58,8 @@ export class AiChatAgent implements ChatAgent {
       messages,
       meta,
       eventProducer: this.eventProducer,
+      systemPromptTemplate: this.systemPromptTemplate,
+      systemPrompt: undefined,
     };
     context.runId = newRunId();
     context.modelId = this.chatExecutor.modelId;
@@ -66,15 +68,19 @@ export class AiChatAgent implements ChatAgent {
     const chatStartMs = Date.now();
     let lastLlmResponseMessages: ChatMessage[] = [];
     do {
-      const systemPrompt = this.systemPromptTemplate
-        ? this.templateSerializer.serialize(this.systemPromptTemplate, meta)
+      // Synthesize the system prompt from the template and meta on each iteration
+      context.systemPrompt = context.systemPromptTemplate
+        ? this.templateSerializer.serialize(
+            context.systemPromptTemplate,
+            context.meta,
+          )
         : undefined;
       if (!started) {
         this.eventProducer.emit(EventName.ChatStart, {
           context,
           startTime: chatStartMs,
           messages,
-          systemPrompt,
+          systemPrompt: context.systemPrompt,
           modelId: this.chatExecutor.modelId,
         });
         started = true;
@@ -84,13 +90,12 @@ export class AiChatAgent implements ChatAgent {
         context,
         startTime: chatExecutorStartMs,
         messages,
-        systemPrompt,
+        systemPrompt: context.systemPrompt,
         modelId: this.chatExecutor.modelId,
       });
       const response = await this.chatExecutor.execute({
         messages,
         tools,
-        systemPrompt,
         context,
       });
       let newResponseMessages = response.responseMessages;

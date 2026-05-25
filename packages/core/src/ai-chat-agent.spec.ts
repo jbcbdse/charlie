@@ -448,4 +448,149 @@ describe("AiChatAgent", () => {
       expect(logs[1].meta).toEqual({ phase: "done", count: 42 });
     });
   });
+
+  describe("systemPrompt on context", () => {
+    // Capturing mock: records what context.systemPrompt looked like on each
+    // executor call, then drives the agent through one tool turn so we can
+    // verify the re-serialization-per-iteration semantics.
+    class CapturingMockExecutor implements ChatExecutor {
+      modelId = "mock-model-id";
+      modelProvider = "mock-model-provider";
+      public seenSystemPrompts: (string | undefined)[] = [];
+      execute = jest.fn(
+        async (
+          input: ChatExecutorInput,
+        ): Promise<ChatAgentGetResponseOutput> => {
+          this.seenSystemPrompts.push(input.context.systemPrompt);
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "tool") {
+            const msg: ChatMessage = {
+              role: "assistant",
+              content: "ok",
+            };
+            return { responseMessage: msg, responseMessages: [msg] };
+          }
+          const msg: ChatMessage = {
+            role: "tool_call",
+            toolCalls: [
+              {
+                function: { name: "BumpCounterTool", arguments: {} },
+                id: "bump-1",
+                type: "function",
+              },
+            ],
+          };
+          return { responseMessage: msg, responseMessages: [msg] };
+        },
+      );
+    }
+
+    class BumpCounterTool extends BaseTool {
+      public name = "BumpCounterTool";
+      public description =
+        "Increments a counter stored in context.meta so the next template " +
+        "serialization picks up a different value.";
+      public schema = z.object({});
+      public handler(
+        _params: z.infer<typeof this.schema>,
+        context: import("./types").ChatAgentContext,
+      ): string {
+        context.meta.counter = ((context.meta.counter as number) || 0) + 1;
+        return "bumped";
+      }
+    }
+
+    it("attaches the serialized system prompt to context on every iteration", async () => {
+      const executor = new CapturingMockExecutor();
+      const localAgent = new AiChatAgent({
+        chatExecutor: executor,
+        systemPromptTemplate: "Counter is {{counter}}",
+      });
+      await localAgent.getResponse({
+        meta: { counter: 7 },
+        messages: [{ role: "user", content: "go" }],
+        tools: [new BumpCounterTool()],
+      });
+      // Two executor calls: initial + post-tool. The counter bumped between
+      // them, so the serialized prompt should differ.
+      expect(executor.seenSystemPrompts).toEqual([
+        expect.stringContaining("Counter is 7"),
+        expect.stringContaining("Counter is 8"),
+      ]);
+    });
+
+    it("leaves context.systemPrompt undefined when no template is configured", async () => {
+      const executor = new CapturingMockExecutor();
+      const localAgent = new AiChatAgent({ chatExecutor: executor });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "go" }],
+        tools: [new BumpCounterTool()],
+      });
+      expect(executor.seenSystemPrompts).toEqual([undefined, undefined]);
+    });
+
+    it("re-serializes the template on the next iteration, reflecting tool template mutations", async () => {
+      // A tool that mutates context.systemPromptTemplate. The next
+      // iteration must serialize the new template, proving that template
+      // mutations are respected.
+      class HijackPromptTool extends BaseTool {
+        public name = "HijackPromptTool";
+        public description = "Overwrites context.systemPromptTemplate mid-run.";
+        public schema = z.object({});
+        public handler(
+          _params: z.infer<typeof this.schema>,
+          context: import("./types").ChatAgentContext,
+        ): string {
+          context.systemPromptTemplate = "HIJACKED";
+          return "hijacked";
+        }
+      }
+      class HijackMockExecutor implements ChatExecutor {
+        modelId = "mock-model-id";
+        modelProvider = "mock-model-provider";
+        public seen: (string | undefined)[] = [];
+        async execute(
+          input: ChatExecutorInput,
+        ): Promise<ChatAgentGetResponseOutput> {
+          this.seen.push(input.context.systemPrompt);
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "tool") {
+            const msg: ChatMessage = {
+              role: "assistant",
+              content: "done",
+            };
+            return { responseMessage: msg, responseMessages: [msg] };
+          }
+          const msg: ChatMessage = {
+            role: "tool_call",
+            toolCalls: [
+              {
+                function: { name: "HijackPromptTool", arguments: {} },
+                id: "hi-1",
+                type: "function",
+              },
+            ],
+          };
+          return { responseMessage: msg, responseMessages: [msg] };
+        }
+      }
+      const executor = new HijackMockExecutor();
+      const localAgent = new AiChatAgent({
+        chatExecutor: executor,
+        systemPromptTemplate: "Template prompt",
+      });
+      await localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "go" }],
+        tools: [new HijackPromptTool()],
+      });
+      expect(executor.seen).toEqual([
+        expect.stringContaining("Template prompt"),
+        expect.stringContaining("HIJACKED"),
+      ]);
+      // The second iteration should use the hijacked template.
+      expect(executor.seen[1]).toBe("HIJACKED");
+    });
+  });
 });

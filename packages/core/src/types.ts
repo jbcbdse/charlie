@@ -106,6 +106,18 @@ export interface ChatAgentContext {
   messages: ChatMessage[];
   meta: ChatAgentContentMeta;
   eventProducer: EventProducer;
+  /**
+   * The system prompt template that can be mutated by tools to affect
+   * subsequent loop iterations. The agent serializes this template on every
+   * iteration using the current `meta` values.
+   */
+  systemPromptTemplate?: string;
+  /**
+   * The synthesized system prompt for the current loop iteration, serialized
+   * from `systemPromptTemplate` and `meta`. This is regenerated each iteration
+   * by the agent. Tools should mutate `systemPromptTemplate` instead.
+   */
+  systemPrompt?: string;
 }
 export interface ChatAgentGetResponseInput {
   messages: ChatMessage[];
@@ -130,7 +142,6 @@ export interface ChatAgent {
 export interface ChatExecutorInput {
   messages: ChatMessage[];
   tools?: ITool[];
-  systemPrompt?: string;
   context: ChatAgentContext;
 }
 export interface ChatExecutor {

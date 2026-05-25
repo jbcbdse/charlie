@@ -41,14 +41,13 @@ export class OpenAiChatExecutor implements ChatExecutor {
   public async execute({
     messages,
     tools,
-    systemPrompt,
     context,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const openAiMessages = this.toOpenAiMessages(messages);
-    if (systemPrompt) {
+    if (context.systemPrompt) {
       openAiMessages.unshift({
         role: "system",
-        content: systemPrompt,
+        content: context.systemPrompt,
       });
     }
     const request: OpenAiCompletionsRequest = {
