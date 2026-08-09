@@ -77,7 +77,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    const responseMessage: OpenAiChatMessage = data.choices[0].message;
+    const responseMessage = data.choices[0].message;
     const msg = this.responseToChatMessage(responseMessage);
     return {
       responseMessage: msg,
@@ -94,27 +94,31 @@ export class OpenAiChatExecutor implements ChatExecutor {
    * When OpenAI responds, it does not include a text message with tool calls, only one or the other
    * and it should always be an "assistant" message
    */
-  private responseToChatMessage(message: OpenAiChatMessage): ChatMessage {
+  private responseToChatMessage(
+    message: OpenAI.Chat.Completions.ChatCompletionMessage,
+  ): ChatMessage {
     if (message.role !== "assistant") {
       throw new Error(`Unexpected response message role: ${message.role}`);
     }
     if (message?.tool_calls && message.tool_calls?.length > 0) {
       return {
         role: "tool_call",
-        toolCalls: message.tool_calls.map((toolCall) => ({
-          function: {
-            name: toolCall.function.name,
-            arguments: JSON.parse(toolCall.function.arguments),
-          },
-          type: "function",
-          id: toolCall.id,
-        })),
+        toolCalls: message.tool_calls
+          .filter((toolCall) => toolCall.type === "function")
+          .map((toolCall) => ({
+            function: {
+              name: toolCall.function.name,
+              arguments: JSON.parse(toolCall.function.arguments),
+            },
+            type: "function",
+            id: toolCall.id,
+          })),
       };
     } else {
       return {
         role: "assistant",
         content: message.content || "",
-        name: message.name,
+        name: undefined,
       };
     }
   }
