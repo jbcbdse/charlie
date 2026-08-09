@@ -104,7 +104,10 @@ describe("Per-Module Response", () => {
       message: "What is 2 plus 2? Reply briefly with the number.",
       agent: "bedrock-mantle",
     });
-    await assertJudge(data.response, "The response indicates that the answer is 4");
+    await assertJudge(
+      data.response,
+      "The response indicates that the answer is 4",
+    );
   });
 });
 

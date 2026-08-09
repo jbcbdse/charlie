@@ -131,9 +131,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     eventProducer: appEventProducer,
   }),
   "bedrock-mantle": new AiChatAgent({
-    chatExecutor: new BedrockMantleExecutor({
-      modelId: "openai.gpt-oss-20b",
-    }),
+    chatExecutor: new BedrockMantleExecutor(),
     systemPromptTemplate: promptTemplate,
   }),
 };

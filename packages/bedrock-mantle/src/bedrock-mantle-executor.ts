@@ -12,24 +12,32 @@ export type BedrockMantleExecutorOptions = Omit<
   region?: string;
 };
 
+export function resolveBedrockMantleOptions(
+  options: BedrockMantleExecutorOptions = {},
+): OpenAiChatExecutorOptions {
+  const region =
+    options.region ||
+    process.env.AWS_REGION ||
+    process.env.AWS_DEFAULT_REGION ||
+    "us-east-1";
+
+  const resolved: OpenAiChatExecutorOptions = {
+    ...options,
+    modelProvider: options.modelProvider ?? "aws-bedrock-mantle",
+    modelId: options.modelId ?? "openai.gpt-oss-20b",
+    baseURL: options.baseURL ?? `https://bedrock-mantle.${region}.api.aws/v1`,
+  };
+
+  if (!resolved.openAiClient && resolved.apiKey === undefined) {
+    const envKey = process.env.AWS_BEARER_TOKEN_BEDROCK;
+    resolved.apiKey = envKey || getTokenProvider({ region });
+  }
+
+  return resolved;
+}
+
 export class BedrockMantleExecutor extends OpenAiChatExecutor {
   constructor(options: BedrockMantleExecutorOptions = {}) {
-    const region =
-      options.region ??
-      process.env.AWS_REGION ??
-      process.env.AWS_DEFAULT_REGION ??
-      "us-east-1";
-
-    options.modelProvider ??= "aws-bedrock-mantle";
-    options.modelId ??= "openai.gpt-oss-20b";
-    options.baseURL ??= `https://bedrock-mantle.${region}.api.aws/v1`;
-
-    if (!options.openAiClient && options.apiKey === undefined) {
-      const envKey =
-        process.env.AWS_BEARER_TOKEN_BEDROCK || process.env.BEDROCK_API_KEY;
-      options.apiKey = envKey || getTokenProvider({ region });
-    }
-
-    super(options as OpenAiChatExecutorOptions);
+    super(resolveBedrockMantleOptions(options));
   }
 }
