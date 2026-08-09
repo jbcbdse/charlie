@@ -99,10 +99,10 @@ describe("Per-Module Response", () => {
     await assertJudge(data.response, CRITERIA);
   });
 
-  test("charlie-bedrock-mantle via bedrock-mantle", async () => {
+  test("charlie-bedrock-mantle via mantle-gpt-oss", async () => {
     const { data } = await chat({
       message: "What is 2 plus 2? Reply briefly with the number.",
-      agent: "bedrock-mantle",
+      agent: "mantle-gpt-oss",
     });
     await assertJudge(
       data.response,

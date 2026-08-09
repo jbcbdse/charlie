@@ -1,5 +1,5 @@
 import {
-  resolveBedrockMantleOptions,
+  BedrockMantleExecutor,
   BedrockMantleExecutorOptions,
 } from "./bedrock-mantle-executor";
 
@@ -16,7 +16,7 @@ const getTokenProviderMock = getTokenProvider as jest.MockedFunction<
   typeof getTokenProvider
 >;
 
-describe("resolveBedrockMantleOptions", () => {
+describe("BedrockMantleExecutor", () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -24,8 +24,8 @@ describe("resolveBedrockMantleOptions", () => {
     process.env = { ...originalEnv };
     delete process.env.AWS_REGION;
     delete process.env.AWS_DEFAULT_REGION;
+    delete process.env.AWS_PROFILE;
     delete process.env.AWS_BEARER_TOKEN_BEDROCK;
-    delete process.env.BEDROCK_API_KEY;
   });
 
   afterAll(() => {
@@ -34,60 +34,73 @@ describe("resolveBedrockMantleOptions", () => {
 
   it("uses explicit region over env", () => {
     process.env.AWS_REGION = "us-west-2";
-    const resolved = resolveBedrockMantleOptions({ region: "eu-west-1" });
-    expect(resolved.baseURL).toBe(
-      "https://bedrock-mantle.eu-west-1.api.aws/v1",
-    );
+    new BedrockMantleExecutor({ region: "eu-west-1" });
+    expect(getTokenProviderMock).toHaveBeenCalledWith({ region: "eu-west-1" });
   });
 
   it("prefers AWS_REGION over AWS_DEFAULT_REGION", () => {
     process.env.AWS_REGION = "us-west-2";
     process.env.AWS_DEFAULT_REGION = "eu-central-1";
-    const resolved = resolveBedrockMantleOptions();
-    expect(resolved.baseURL).toBe(
-      "https://bedrock-mantle.us-west-2.api.aws/v1",
-    );
+    new BedrockMantleExecutor();
+    expect(getTokenProviderMock).toHaveBeenCalledWith({ region: "us-west-2" });
   });
 
   it("falls through empty-string env to default region", () => {
     process.env.AWS_REGION = "";
     process.env.AWS_DEFAULT_REGION = "";
-    const resolved = resolveBedrockMantleOptions();
-    expect(resolved.baseURL).toBe(
-      "https://bedrock-mantle.us-east-1.api.aws/v1",
-    );
+    new BedrockMantleExecutor();
+    expect(getTokenProviderMock).toHaveBeenCalledWith({ region: "us-east-1" });
   });
 
   it("defaults modelProvider and modelId", () => {
-    const resolved = resolveBedrockMantleOptions();
-    expect(resolved.modelProvider).toBe("aws-bedrock-mantle");
-    expect(resolved.modelId).toBe("openai.gpt-oss-20b");
+    const executor = new BedrockMantleExecutor();
+    expect(executor.modelProvider).toBe("aws-bedrock-mantle");
+    expect(executor.modelId).toBe("openai.gpt-oss-20b");
+  });
+
+  it("accepts explicit constructor options", () => {
+    const executor = new BedrockMantleExecutor({
+      modelId: "openai.gpt-oss-120b",
+      modelProvider: "custom-mantle",
+      region: "eu-west-1",
+      apiKey: "explicit",
+    });
+    expect(executor.modelId).toBe("openai.gpt-oss-120b");
+    expect(executor.modelProvider).toBe("custom-mantle");
+    expect(getTokenProviderMock).not.toHaveBeenCalled();
   });
 
   it("uses AWS_BEARER_TOKEN_BEDROCK instead of token provider", () => {
     process.env.AWS_BEARER_TOKEN_BEDROCK = "env-token";
-    const resolved = resolveBedrockMantleOptions();
-    expect(resolved.apiKey).toBe("env-token");
+    new BedrockMantleExecutor();
     expect(getTokenProviderMock).not.toHaveBeenCalled();
   });
 
   it("does not generate a token when apiKey is provided", () => {
-    const resolved = resolveBedrockMantleOptions({ apiKey: "explicit" });
-    expect(resolved.apiKey).toBe("explicit");
+    new BedrockMantleExecutor({ apiKey: "explicit" });
     expect(getTokenProviderMock).not.toHaveBeenCalled();
   });
 
   it("does not generate a token when openAiClient is provided", () => {
     const openAiClient = {} as BedrockMantleExecutorOptions["openAiClient"];
-    const resolved = resolveBedrockMantleOptions({ openAiClient });
-    expect(resolved.openAiClient).toBe(openAiClient);
-    expect(resolved.apiKey).toBeUndefined();
+    new BedrockMantleExecutor({ openAiClient });
     expect(getTokenProviderMock).not.toHaveBeenCalled();
   });
 
-  it("falls back to token provider with resolved region", () => {
-    const resolved = resolveBedrockMantleOptions({ region: "ap-south-1" });
-    expect(getTokenProviderMock).toHaveBeenCalledWith({ region: "ap-south-1" });
-    expect(typeof resolved.apiKey).toBe("function");
+  it("passes profile to token provider from options", () => {
+    new BedrockMantleExecutor({ region: "ap-south-1", profile: "default" });
+    expect(getTokenProviderMock).toHaveBeenCalledWith({
+      region: "ap-south-1",
+      profile: "default",
+    });
+  });
+
+  it("passes profile to token provider from AWS_PROFILE", () => {
+    process.env.AWS_PROFILE = "default";
+    new BedrockMantleExecutor({ region: "us-east-1" });
+    expect(getTokenProviderMock).toHaveBeenCalledWith({
+      region: "us-east-1",
+      profile: "default",
+    });
   });
 });

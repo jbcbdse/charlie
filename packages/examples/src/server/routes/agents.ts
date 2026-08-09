@@ -11,7 +11,10 @@ export type AvailableAgent =
   | "gpt4o"
   | "grok"
   | "gemini"
-  | "bedrock-mantle";
+  | "mantle-gpt-oss"
+  | "mantle-deepseek"
+  | "mantle-glm"
+  | "mantle-grok";
 
 export function agentsHandler(availableAgents: AvailableAgent[]) {
   return (_req: Request, res: Response) => {
