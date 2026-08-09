@@ -6,10 +6,11 @@
   },
   "include": ["./src/**/*.ts"],
   "references": [
-    { "path": "../bedrock" },
-    { "path": "../bedrock-mantle" },
-    { "path": "../core" },
-    { "path": "../google" },
-    { "path": "../openai" }
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../openai"
+    }
   ]
 }

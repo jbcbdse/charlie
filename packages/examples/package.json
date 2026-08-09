@@ -18,6 +18,7 @@
   "license": "MIT",
   "dependencies": {
     "@jbcbdse/charlie-bedrock": "^0.3.0",
+    "@jbcbdse/charlie-bedrock-mantle": "^0.3.0",
     "@jbcbdse/charlie-core": "^0.3.0",
     "@jbcbdse/charlie-datadog": "^0.3.0",
     "@jbcbdse/charlie-google": "^0.3.0",

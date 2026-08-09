@@ -17,6 +17,7 @@ import { CountLettersTool } from "../tools/letter-count.tool";
 import { CurrentTimeTool } from "../tools/current-time.tool";
 import { GeminiExecutor } from "@jbcbdse/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
+import { BedrockMantleExecutor } from "@jbcbdse/charlie-bedrock-mantle";
 import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
 import dotenv from "dotenv";
 import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
@@ -128,6 +129,12 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
+  }),
+  "bedrock-mantle": new AiChatAgent({
+    chatExecutor: new BedrockMantleExecutor({
+      modelId: "openai.gpt-oss-20b",
+    }),
+    systemPromptTemplate: promptTemplate,
   }),
 };
 

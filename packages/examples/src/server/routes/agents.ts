@@ -10,7 +10,8 @@ export type AvailableAgent =
   | "titan"
   | "gpt4o"
   | "grok"
-  | "gemini";
+  | "gemini"
+  | "bedrock-mantle";
 
 export function agentsHandler(availableAgents: AvailableAgent[]) {
   return (_req: Request, res: Response) => {

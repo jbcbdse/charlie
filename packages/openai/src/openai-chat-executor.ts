@@ -14,7 +14,7 @@ export interface OpenAiChatExecutorOptions {
   modelId: string;
   promptSerializer?: TemplateSerializer;
   openAiClient?: OpenAI;
-  apiKey?: string;
+  apiKey?: string | (() => Promise<string>);
   baseURL?: string;
   dangerouslyAllowBrowser?: boolean;
   maxRetries?: number;

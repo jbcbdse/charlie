@@ -1,0 +1,31 @@
+{
+  "name": "@jbcbdse/charlie-bedrock-mantle",
+  "version": "0.3.0",
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbcbdse/charlie.git"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc -p ./tsconfig.json",
+    "lint": "eslint --config ../../eslint.config.mjs .",
+    "test": "jest"
+  },
+  "author": "Jonathan Barnett",
+  "license": "MIT",
+  "dependencies": {
+    "@aws/bedrock-token-generator": "^1.1.0",
+    "@jbcbdse/charlie-openai": "^0.3.0"
+  }
+}

@@ -19,6 +19,7 @@ import { CountLettersTool } from "../tools/letter-count.tool";
 import { CurrentTimeTool } from "../tools/current-time.tool";
 import { GeminiExecutor } from "@jbcbdse/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
+import { BedrockMantleExecutor } from "@jbcbdse/charlie-bedrock-mantle";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
 import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
@@ -81,7 +82,8 @@ type AvailableAgent =
   | "titan"
   | "gpt4o"
   | "grok"
-  | "gemini";
+  | "gemini"
+  | "bedrock-mantle";
 const agents: Record<AvailableAgent, ChatAgent> = {
   claude: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -163,6 +165,12 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
+  }),
+  "bedrock-mantle": new AiChatAgent({
+    chatExecutor: new BedrockMantleExecutor({
+      modelId: "openai.gpt-oss-20b",
+    }),
+    systemPromptTemplate: promptTemplate,
   }),
 };
 const tools = [

@@ -10,12 +10,13 @@ Charlie is a TypeScript monorepo that provides a thin, stateless layer for calli
 
 ```
 packages/
-  core/       — interfaces, AiChatAgent, BaseTool, event system   (@jbcbdse/charlie-core)
-  bedrock/    — BedrockChatExecutor, Bedrock embedding generators  (@jbcbdse/charlie-bedrock)
-  openai/     — OpenAiChatExecutor, GrokExecutor, OAI embeddings  (@jbcbdse/charlie-openai)
-  google/     — GeminiExecutor                                     (@jbcbdse/charlie-google)
-  datadog/    — LlmSpansApi (subscribes to events, sends spans)   (@jbcbdse/charlie-datadog)
-  examples/   — REPL, HTTP server, e2e tests (not published)
+  core/            — interfaces, AiChatAgent, BaseTool, event system   (@jbcbdse/charlie-core)
+  bedrock/         — BedrockChatExecutor, Bedrock embedding generators  (@jbcbdse/charlie-bedrock)
+  bedrock-mantle/  — BedrockMantleExecutor (OpenAI-compatible Mantle)   (@jbcbdse/charlie-bedrock-mantle)
+  openai/          — OpenAiChatExecutor, GrokExecutor, OAI embeddings  (@jbcbdse/charlie-openai)
+  google/          — GeminiExecutor                                     (@jbcbdse/charlie-google)
+  datadog/         — LlmSpansApi (subscribes to events, sends spans)   (@jbcbdse/charlie-datadog)
+  examples/        — REPL, HTTP server, e2e tests (not published)
 ```
 
 Dependency graph: everything depends on `core`. `datadog` depends only on `core`. `examples` depends on all packages. Build order matters: build `core` before anything else.
