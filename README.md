@@ -25,6 +25,8 @@ Install vendor-specific packages:
 npm install @jbcbdse/charlie-openai
 # for bedrock
 npm install @jbcbdse/charlie-bedrock
+# for bedrock mantle (OpenAI-compatible)
+npm install @jbcbdse/charlie-bedrock-mantle
 # for google (gemini)
 npm install @jbcbdse/charlie-google
 ```

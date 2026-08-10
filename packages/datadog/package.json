@@ -1,6 +1,6 @@
 {
   "name": "@jbcbdse/charlie-datadog",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -11,7 +11,7 @@
   "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
-    "@jbcbdse/charlie-core": "^0.3.0",
+    "@jbcbdse/charlie-core": "^0.4.0",
     "axios": "^1.7.7",
     "uuid": "^10.0.0"
   }
