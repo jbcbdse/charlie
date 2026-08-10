@@ -19,6 +19,7 @@ import { CountLettersTool } from "../tools/letter-count.tool";
 import { CurrentTimeTool } from "../tools/current-time.tool";
 import { GeminiExecutor } from "@jbcbdse/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
+import { BedrockMantleExecutor } from "@jbcbdse/charlie-bedrock-mantle";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
 import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
@@ -81,7 +82,11 @@ type AvailableAgent =
   | "titan"
   | "gpt4o"
   | "grok"
-  | "gemini";
+  | "gemini"
+  | "mantle-gpt-oss"
+  | "mantle-deepseek"
+  | "mantle-glm"
+  | "mantle-grok";
 const agents: Record<AvailableAgent, ChatAgent> = {
   claude: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -160,6 +165,41 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     chatExecutor: new GeminiExecutor({
       modelId: "gemini-2.5-flash",
       apiKey: process.env.GOOGLE_API_KEY!,
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  // Bedrock Mantle (OpenAI-compatible). Claude on Mantle uses Messages API, not Chat Completions.
+  "mantle-gpt-oss": new AiChatAgent({
+    chatExecutor: new BedrockMantleExecutor({
+      modelId: "openai.gpt-oss-20b",
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  "mantle-deepseek": new AiChatAgent({
+    chatExecutor: new BedrockMantleExecutor({
+      modelId: "deepseek.v3.2",
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  "mantle-glm": new AiChatAgent({
+    chatExecutor: new BedrockMantleExecutor({
+      modelId: "zai.glm-4.7-flash",
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  "mantle-grok": new AiChatAgent({
+    chatExecutor: new BedrockMantleExecutor({
+      modelId: "xai.grok-4.3",
+      // Grok on Mantle is served under /openai/v1, not /v1
+      baseURL: `https://bedrock-mantle.${
+        process.env.AWS_REGION ||
+        process.env.AWS_DEFAULT_REGION ||
+        "us-east-1"
+      }.api.aws/openai/v1`,
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
