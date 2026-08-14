@@ -11,7 +11,7 @@ import {
   MessageUser,
 } from "@jbcbdse/charlie-core";
 import { randomUUID } from "node:crypto";
-import { AvailableAgent } from "./agents";
+import { AvailableAgent, DEFAULT_AGENT, agentKeysByProvider } from "./agents";
 
 interface ChatRequest {
   message: string;
@@ -36,7 +36,7 @@ export function chatHandler(
   return async (req: Request, res: Response) => {
     const {
       message,
-      agent = "claude",
+      agent = DEFAULT_AGENT,
       messages = [],
       user = {},
     }: ChatRequest = req.body;
@@ -93,7 +93,7 @@ export function chatHandler(
             preferred_name: "Jon",
             ...user,
           },
-          availableAgents,
+          availableAgents: agentKeysByProvider,
         },
       });
 

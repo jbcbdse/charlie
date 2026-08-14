@@ -27,6 +27,13 @@ import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
 import dotenv from "dotenv";
 import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
 import { DeleteAccountTool } from "../tools/delete-account.tool";
+import {
+  AvailableAgent,
+  DEFAULT_AGENT,
+  agentKeysByProvider,
+  availableAgents,
+  formatAgentsByProvider,
+} from "../server/routes/agents";
 dotenv.config({ path: "../../.env" });
 
 const appEventProducer = new EventProducer();
@@ -73,24 +80,8 @@ const promptTemplate = [
 ].join("\n");
 const toolAssistantFilter = new ToolAssistantFilter();
 const inlineToolCallParser = new InlineToolCallParser();
-type AvailableAgent =
-  | "claude"
-  | "mistral"
-  | "commandr"
-  | "llama"
-  | "jamba-large"
-  | "nova"
-  | "titan"
-  | "gpt4o"
-  | "grok"
-  | "gemini"
-  | "mantle-gpt-oss"
-  | "mantle-deepseek"
-  | "mantle-glm"
-  | "mantle-grok"
-  | "ollama";
 const agents: Record<AvailableAgent, ChatAgent> = {
-  claude: new AiChatAgent({
+  "aws-bedrock/us.anthropic.claude-sonnet-4-6": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "us.anthropic.claude-sonnet-4-6",
     }),
@@ -98,7 +89,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     preToolCallTransformers: [toolAssistantFilter],
     eventProducer: appEventProducer,
   }),
-  mistral: new AiChatAgent({
+  "aws-bedrock/mistral.mistral-large-3-675b-instruct": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "mistral.mistral-large-3-675b-instruct",
     }),
@@ -106,7 +97,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     preToolCallTransformers: [toolAssistantFilter],
     eventProducer: appEventProducer,
   }),
-  commandr: new AiChatAgent({
+  "aws-bedrock/us.meta.llama4-scout-17b-instruct-v1:0": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "us.meta.llama4-scout-17b-instruct-v1:0",
     }),
@@ -114,7 +105,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     preToolCallTransformers: [toolAssistantFilter],
     eventProducer: appEventProducer,
   }),
-  llama: new AiChatAgent({
+  "aws-bedrock/us.meta.llama3-3-70b-instruct-v1:0": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "us.meta.llama3-3-70b-instruct-v1:0",
     }),
@@ -122,7 +113,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     preToolCallTransformers: [toolAssistantFilter],
     eventProducer: appEventProducer,
   }),
-  "jamba-large": new AiChatAgent({
+  "aws-bedrock/ai21.jamba-1-5-large-v1:0": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "ai21.jamba-1-5-large-v1:0",
     }),
@@ -130,7 +121,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     preToolCallTransformers: [toolAssistantFilter],
     eventProducer: appEventProducer,
   }),
-  nova: new AiChatAgent({
+  "aws-bedrock/us.amazon.nova-2-lite-v1:0": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "us.amazon.nova-2-lite-v1:0",
     }),
@@ -138,7 +129,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     preToolCallTransformers: [toolAssistantFilter],
     eventProducer: appEventProducer,
   }),
-  titan: new AiChatAgent({
+  "aws-bedrock/us.amazon.nova-micro-v1:0": new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
       modelId: "us.amazon.nova-micro-v1:0",
       toolsSupported: false,
@@ -147,15 +138,15 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     preToolCallTransformers: [inlineToolCallParser, toolAssistantFilter],
     eventProducer: appEventProducer,
   }),
-  gpt4o: new AiChatAgent({
+  "openai/gpt-5.6": new AiChatAgent({
     chatExecutor: new OpenAiChatExecutor({
-      modelId: "o4-mini",
+      modelId: "gpt-5.6",
       apiKey: process.env.OPENAI_API_KEY!,
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
   }),
-  grok: new AiChatAgent({
+  "xAI/grok-4.3": new AiChatAgent({
     chatExecutor: new GrokExecutor({
       modelId: "grok-4.3",
       apiKey: process.env.XAI_API_KEY!,
@@ -163,7 +154,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
   }),
-  gemini: new AiChatAgent({
+  "google/gemini-2.5-flash": new AiChatAgent({
     chatExecutor: new GeminiExecutor({
       modelId: "gemini-2.5-flash",
       apiKey: process.env.GOOGLE_API_KEY!,
@@ -171,42 +162,39 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
   }),
-  // Bedrock Mantle (OpenAI-compatible). Claude on Mantle uses Messages API, not Chat Completions.
-  "mantle-gpt-oss": new AiChatAgent({
+  "aws-bedrock-mantle/openai.gpt-oss-20b": new AiChatAgent({
     chatExecutor: new BedrockMantleExecutor({
       modelId: "openai.gpt-oss-20b",
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
   }),
-  "mantle-deepseek": new AiChatAgent({
+  "aws-bedrock-mantle/deepseek.v3.2": new AiChatAgent({
     chatExecutor: new BedrockMantleExecutor({
       modelId: "deepseek.v3.2",
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
   }),
-  "mantle-glm": new AiChatAgent({
+  "aws-bedrock-mantle/zai.glm-4.7-flash": new AiChatAgent({
     chatExecutor: new BedrockMantleExecutor({
       modelId: "zai.glm-4.7-flash",
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
   }),
-  "mantle-grok": new AiChatAgent({
+  "aws-bedrock-mantle/xai.grok-4.3": new AiChatAgent({
     chatExecutor: new BedrockMantleExecutor({
       modelId: "xai.grok-4.3",
       // Grok on Mantle is served under /openai/v1, not /v1
       baseURL: `https://bedrock-mantle.${
-        process.env.AWS_REGION ||
-        process.env.AWS_DEFAULT_REGION ||
-        "us-east-1"
+        process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1"
       }.api.aws/openai/v1`,
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
   }),
-  ollama: new AiChatAgent({
+  "ollama/qwen3.6:35b-a3b": new AiChatAgent({
     chatExecutor: new OllamaExecutor({
       modelId: "qwen3.6:35b-a3b",
     }),
@@ -222,10 +210,7 @@ const tools = [
   new DeleteAccountTool(),
 ];
 const messageHistory: ChatMessage[] = [];
-const availableAgents: AvailableAgent[] = Object.keys(
-  agents,
-) as AvailableAgent[];
-let currentAgent: AvailableAgent = "claude";
+let currentAgent: AvailableAgent = DEFAULT_AGENT;
 
 async function handleChat(input: string): Promise<string> {
   const userMessage: MessageUser = {
@@ -243,7 +228,7 @@ async function handleChat(input: string): Promise<string> {
           last_name: "Barnett",
           preferred_name: "Jon",
         },
-        availableAgents,
+        availableAgents: agentKeysByProvider,
       },
     })
     .catch((err) => {
@@ -313,9 +298,18 @@ async function startRepl() {
   console.log("Welcome to the chatbot REPL");
   console.log(`Using agent ${currentAgent}`);
   console.log("Type use <agent> to switch agents");
-  console.log(`The available agents are ${availableAgents.join(", ")}`);
+  console.log(`The available agents are:\n${formatAgentsByProvider()}`);
   const r = repl.start({
     prompt: "> ",
+    completer: (line: string): [string[], string] => {
+      const prefix = "use ";
+      if (!line.startsWith(prefix)) {
+        return [[], line];
+      }
+      const rest = line.slice(prefix.length);
+      const hits = availableAgents.filter((agent) => agent.startsWith(rest));
+      return [hits.map((agent) => `${prefix}${agent}`), line];
+    },
     eval: async (cmd, context, filename, cb) => {
       const response = await handleCmd(cmd);
       if (response !== null) {

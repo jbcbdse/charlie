@@ -43,6 +43,8 @@ interface OpenAiTool {
     parameters: Record<string, unknown>;
   };
 }
+export type OpenAiReasoningEffort = "none" | "low" | "medium" | "high";
+
 export interface OpenAiCompletionsRequest {
   messages: OpenAiChatMessage[];
   model: string;
@@ -52,4 +54,5 @@ export interface OpenAiCompletionsRequest {
     | "auto"
     | "required"
     | { type: "function"; function: { name: string } };
+  reasoning_effort?: OpenAiReasoningEffort;
 }

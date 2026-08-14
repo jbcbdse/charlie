@@ -67,42 +67,42 @@ afterAll(() => {
 describe("Per-Module Response", () => {
   const CRITERIA = "The response is a greeting from an AI assistant";
 
-  test("charlie-bedrock via claude", async () => {
+  test("charlie-bedrock via aws-bedrock/us.anthropic.claude-sonnet-4-6", async () => {
     const { data } = await chat({
       message: "Say hello and tell me your name",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     await assertJudge(data.response, CRITERIA);
   });
 
-  test("charlie-openai via gpt4o", async () => {
+  test("charlie-openai via openai/gpt-5.6", async () => {
     const { data } = await chat({
       message: "Say hello and tell me your name",
-      agent: "gpt4o",
+      agent: "openai/gpt-5.6",
     });
     await assertJudge(data.response, CRITERIA);
   });
 
-  test("charlie-google via gemini", async () => {
+  test("charlie-google via google/gemini-2.5-flash", async () => {
     const { data } = await chat({
       message: "Say hello and tell me your name",
-      agent: "gemini",
+      agent: "google/gemini-2.5-flash",
     });
     await assertJudge(data.response, CRITERIA);
   });
 
-  test("charlie-openai via GrokExecutor (grok)", async () => {
+  test("charlie-openai via GrokExecutor (xAI/grok-4.3)", async () => {
     const { data } = await chat({
       message: "Say hello and tell me your name",
-      agent: "grok",
+      agent: "xAI/grok-4.3",
     });
     await assertJudge(data.response, CRITERIA);
   });
 
-  test("charlie-bedrock-mantle via mantle-gpt-oss", async () => {
+  test("charlie-bedrock-mantle via aws-bedrock-mantle/openai.gpt-oss-20b", async () => {
     const { data } = await chat({
       message: "What is 2 plus 2? Reply briefly with the number.",
-      agent: "mantle-gpt-oss",
+      agent: "aws-bedrock-mantle/openai.gpt-oss-20b",
     });
     await assertJudge(
       data.response,
@@ -129,7 +129,7 @@ describe("Per-Module Response", () => {
     }
     const { data } = await chat({
       message: "Say hello and tell me your name",
-      agent: "ollama",
+      agent: "ollama/qwen3.6:35b-a3b",
     });
     await assertJudge(data.response, CRITERIA);
   }, 180_000);
@@ -140,13 +140,25 @@ describe("Per-Module Response", () => {
 // ---------------------------------------------------------------------------
 describe("Bedrock Model Smoke Tests", () => {
   test.each([
-    ["claude", "baseline Bedrock model"],
-    ["mistral", "Mistral tool call quirks"],
-    ["commandr", "Llama4 Scout message format"],
-    ["llama", "Llama inline tool parsing"],
-    ["jamba-large", "AI21 Jamba format"],
-    ["nova", "Amazon Nova"],
-    ["titan", "toolsSupported=false + InlineToolCallParser"],
+    ["aws-bedrock/us.anthropic.claude-sonnet-4-6", "baseline Bedrock model"],
+    [
+      "aws-bedrock/mistral.mistral-large-3-675b-instruct",
+      "Mistral tool call quirks",
+    ],
+    [
+      "aws-bedrock/us.meta.llama4-scout-17b-instruct-v1:0",
+      "Llama4 Scout message format",
+    ],
+    [
+      "aws-bedrock/us.meta.llama3-3-70b-instruct-v1:0",
+      "Llama inline tool parsing",
+    ],
+    ["aws-bedrock/ai21.jamba-1-5-large-v1:0", "AI21 Jamba format"],
+    ["aws-bedrock/us.amazon.nova-2-lite-v1:0", "Amazon Nova"],
+    [
+      "aws-bedrock/us.amazon.nova-micro-v1:0",
+      "toolsSupported=false + InlineToolCallParser",
+    ],
   ])("%s responds with non-empty output (%s)", async (agent) => {
     const { status, data } = await chat({
       message: "Reply with exactly the word PONG",
@@ -165,7 +177,7 @@ describe("Tool Calling", () => {
   test("CalculatorTool — computes result and returns 105", async () => {
     const { data } = await chat({
       message: "What is 15 multiplied by 7?",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     expect(data.response).toContain("105");
   });
@@ -173,7 +185,7 @@ describe("Tool Calling", () => {
   test("CountLettersTool — counts 2 L's in hello", async () => {
     const { data } = await chat({
       message: "How many L's are in the word 'hello'?",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     expect(data.response).toMatch(/\b2\b/);
   });
@@ -181,7 +193,7 @@ describe("Tool Calling", () => {
   test("CountLettersTool — emits ToolProgress and Log events", async () => {
     const { data } = await chat({
       message: "How many L's are in the word 'hello'?",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     const events = data.events ?? [];
     const progress = events.filter((e) => e.name === "tool:progress");
@@ -207,7 +219,7 @@ describe("Tool Calling", () => {
   test("CurrentTimeTool — returns a time value", async () => {
     const { data } = await chat({
       message: "What time is it right now?",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     await assertJudge(
       data.response,
@@ -218,7 +230,7 @@ describe("Tool Calling", () => {
   test("DirectBirthdayTool — returnDirect stops the agent loop", async () => {
     const { data } = await chat({
       message: "Set my birthday to January 1st, 2000",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     // After the tool message with returnDirect=true, no further tool_call should appear
     const toolIdx = data.messages.map((m) => m.role).lastIndexOf("tool");
@@ -233,7 +245,7 @@ describe("Tool Calling", () => {
   test("DeleteAccountTool — asks for confirmation when not certain", async () => {
     const { data } = await chat({
       message: "Please use the DeleteAccountTool to delete my account.",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     await assertJudge(
       data.response,
@@ -244,11 +256,11 @@ describe("Tool Calling", () => {
   test("DeleteAccountTool — deletes account after user confirms (multi-turn)", async () => {
     const turn1 = await chat({
       message: "Please use the DeleteAccountTool to delete my account.",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     const { data } = await chat({
       message: "Yes, I'm certain, please delete my account now",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
       messages: turn1.data.messages,
     });
     await assertJudge(
@@ -257,10 +269,10 @@ describe("Tool Calling", () => {
     );
   });
 
-  test("CalculatorTool via Titan (InlineToolCallParser)", async () => {
+  test("CalculatorTool via nova-micro (InlineToolCallParser)", async () => {
     const { status, data } = await chat({
       message: "What is 15 multiplied by 7?",
-      agent: "titan",
+      agent: "aws-bedrock/us.amazon.nova-micro-v1:0",
     });
     expect(status).toBe(200);
     expect(data.response).toContain("105");
@@ -274,11 +286,11 @@ describe("Message History", () => {
   test("preserves context across turns", async () => {
     const turn1 = await chat({
       message: "My favorite color is ultraviolet",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
     });
     const { data } = await chat({
       message: "What is my favorite color?",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
       messages: turn1.data.messages,
     });
     await assertJudge(
@@ -295,7 +307,7 @@ describe("Template System", () => {
   test("user metadata is injected into system prompt", async () => {
     const { data } = await chat({
       message: "What is my preferred name?",
-      agent: "claude",
+      agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
       user: { preferred_name: "Zaphod" },
     });
     await assertJudge(

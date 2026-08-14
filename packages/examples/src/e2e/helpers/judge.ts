@@ -23,7 +23,10 @@ export async function judge(
     const res = await fetch(`${BASE_URL}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, agent: "claude" }),
+      body: JSON.stringify({
+        message,
+        agent: "aws-bedrock/us.anthropic.claude-sonnet-4-6",
+      }),
     });
 
     const data = (await res.json()) as { response: string };
