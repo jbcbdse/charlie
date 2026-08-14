@@ -14,7 +14,8 @@ export type AvailableAgent =
   | "mantle-gpt-oss"
   | "mantle-deepseek"
   | "mantle-glm"
-  | "mantle-grok";
+  | "mantle-grok"
+  | "ollama";
 
 export function agentsHandler(availableAgents: AvailableAgent[]) {
   return (_req: Request, res: Response) => {

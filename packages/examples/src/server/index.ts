@@ -18,6 +18,7 @@ import { CurrentTimeTool } from "../tools/current-time.tool";
 import { GeminiExecutor } from "@jbcbdse/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
 import { BedrockMantleExecutor } from "@jbcbdse/charlie-bedrock-mantle";
+import { OllamaExecutor } from "@jbcbdse/charlie-ollama";
 import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
 import dotenv from "dotenv";
 import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
@@ -161,6 +162,13 @@ const agents: Record<AvailableAgent, ChatAgent> = {
         process.env.AWS_DEFAULT_REGION ||
         "us-east-1"
       }.api.aws/openai/v1`,
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  ollama: new AiChatAgent({
+    chatExecutor: new OllamaExecutor({
+      modelId: "qwen3.6:35b-a3b",
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,

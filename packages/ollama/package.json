@@ -1,0 +1,30 @@
+{
+  "name": "@jbcbdse/charlie-ollama",
+  "version": "0.4.0",
+  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbcbdse/charlie.git"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc -p ./tsconfig.json",
+    "lint": "eslint --config ../../eslint.config.mjs .",
+    "test": "jest"
+  },
+  "author": "Jonathan Barnett",
+  "license": "MIT",
+  "dependencies": {
+    "@jbcbdse/charlie-openai": "^0.4.0"
+  }
+}

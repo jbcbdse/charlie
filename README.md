@@ -29,6 +29,8 @@ npm install @jbcbdse/charlie-bedrock
 npm install @jbcbdse/charlie-bedrock-mantle
 # for google (gemini)
 npm install @jbcbdse/charlie-google
+# for ollama (OpenAI-compatible)
+npm install @jbcbdse/charlie-ollama
 ```
 
 ## Features

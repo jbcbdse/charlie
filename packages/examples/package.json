@@ -22,6 +22,7 @@
     "@jbcbdse/charlie-core": "^0.4.0",
     "@jbcbdse/charlie-datadog": "^0.4.0",
     "@jbcbdse/charlie-google": "^0.4.0",
+    "@jbcbdse/charlie-ollama": "^0.4.0",
     "@jbcbdse/charlie-openai": "^0.4.0",
     "@types/express": "^5.0.6",
     "dotenv": "^16.4.7",
