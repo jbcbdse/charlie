@@ -23,10 +23,10 @@ export class OllamaExecutor extends OpenAiChatExecutor {
       modelProvider: options.modelProvider ?? "ollama",
       modelId: options.modelId ?? "qwen3.6:35b-a3b",
       baseURL:
-        options.baseURL ??
-        process.env.OLLAMA_BASE_URL ??
+        options.baseURL ||
+        process.env.OLLAMA_BASE_URL ||
         "http://localhost:11434/v1",
-      apiKey: options.apiKey ?? process.env.OLLAMA_API_KEY ?? "ollama",
+      apiKey: options.apiKey || process.env.OLLAMA_API_KEY || "ollama",
     };
   }
 }

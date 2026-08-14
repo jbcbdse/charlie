@@ -111,6 +111,22 @@ describe("Per-Module Response", () => {
   });
 
   test("charlie-ollama via ollama", async () => {
+    try {
+      const res = await fetch("http://localhost:11434/api/tags", {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!res.ok) {
+        console.warn(
+          "Skipping charlie-ollama e2e: Ollama not reachable at localhost:11434",
+        );
+        return;
+      }
+    } catch {
+      console.warn(
+        "Skipping charlie-ollama e2e: Ollama not reachable at localhost:11434",
+      );
+      return;
+    }
     const { data } = await chat({
       message: "Say hello and tell me your name",
       agent: "ollama",

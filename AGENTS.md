@@ -71,7 +71,7 @@ npx jest --config tsconfig.test.json
 
 The e2e suite starts the HTTP server as a subprocess, runs tests against it, then tears it down. It uses an LLM judge (calling Claude via Bedrock) to evaluate open-ended responses. See `packages/examples/AGENTS.md` for the agent/model lineup.
 
-Copy `.env.example` to `.env` and fill in keys. AWS credentials must have Bedrock model access in `us-east-1`. `GOOGLE_API_KEY` is optional; the `gemini` agent will error if absent.
+Copy `.env.example` to `.env` and fill in keys. AWS credentials must have Bedrock model access in `us-east-1`. `GOOGLE_API_KEY` is optional; the `gemini` agent will error if absent. The `ollama` e2e test needs a local Ollama at `localhost:11434` with `qwen3.6:35b-a3b` pulled; it skips if Ollama is unreachable.
 
 ## Adding a new executor package
 
