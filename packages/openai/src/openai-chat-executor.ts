@@ -124,51 +124,53 @@ export class OpenAiChatExecutor implements ChatExecutor {
   }
 
   private toOpenAiMessages(messages: ChatMessage[]): OpenAiChatMessage[] {
-    return messages.map((msg) => {
-      if (msg.role === "user") {
-        return {
-          role: "user",
-          content: msg.content,
-          name: msg.name,
-        };
-      }
-      if (msg.role === "system") {
-        return {
-          role: "system",
-          content: msg.content,
-          name: msg.name,
-        };
-      }
-      if (msg.role === "tool_call") {
-        return {
-          role: "assistant",
-          content: "",
-          tool_calls: msg.toolCalls.map((toolCall) => ({
-            id: toolCall.id,
-            type: "function",
-            function: {
-              name: toolCall.function.name,
-              arguments: JSON.stringify(toolCall.function.arguments),
-            },
-          })),
-        };
-      }
-      if (msg.role === "assistant") {
-        return {
-          role: "assistant",
-          content: msg.content,
-          name: msg.name,
-        };
-      }
-      if (msg.role === "tool") {
-        return {
-          role: "tool",
-          content: msg.content,
-          tool_call_id: msg.toolCallId,
-        };
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      throw new Error(`Unknown message role: ${(msg as any)?.role}`);
-    });
+    return messages
+      .filter((msg) => msg.role !== "reasoning")
+      .map((msg) => {
+        if (msg.role === "user") {
+          return {
+            role: "user",
+            content: msg.content,
+            name: msg.name,
+          };
+        }
+        if (msg.role === "system") {
+          return {
+            role: "system",
+            content: msg.content,
+            name: msg.name,
+          };
+        }
+        if (msg.role === "tool_call") {
+          return {
+            role: "assistant",
+            content: "",
+            tool_calls: msg.toolCalls.map((toolCall) => ({
+              id: toolCall.id,
+              type: "function",
+              function: {
+                name: toolCall.function.name,
+                arguments: JSON.stringify(toolCall.function.arguments),
+              },
+            })),
+          };
+        }
+        if (msg.role === "assistant") {
+          return {
+            role: "assistant",
+            content: msg.content,
+            name: msg.name,
+          };
+        }
+        if (msg.role === "tool") {
+          return {
+            role: "tool",
+            content: msg.content,
+            tool_call_id: msg.toolCallId,
+          };
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        throw new Error(`Unknown message role: ${(msg as any)?.role}`);
+      });
   }
 }

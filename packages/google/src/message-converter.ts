@@ -4,7 +4,9 @@ import { ChatMessage } from "@jbcbdse/charlie-core";
 export class MessageConverter {
   public toContentObjects(messages: ChatMessage[]): Content[] {
     const contents = this.condense(
-      messages.map((message) => this.toContent(message)),
+      messages
+        .filter((message) => message.role !== "reasoning")
+        .map((message) => this.toContent(message)),
     );
     return contents;
   }

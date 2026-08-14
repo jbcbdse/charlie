@@ -1,6 +1,6 @@
 import {
-  OpenAiChatExecutor,
-  OpenAiChatExecutorOptions,
+  OpenAiResponsesExecutor,
+  OpenAiResponsesExecutorOptions,
 } from "@jbcbdse/charlie-openai";
 import {
   bedrockMantleBaseURL,
@@ -8,23 +8,23 @@ import {
   resolveMantleApiKey,
 } from "./mantle-options";
 
-export type BedrockMantleExecutorOptions = Omit<
-  OpenAiChatExecutorOptions,
+export type BedrockMantleResponsesExecutorOptions = Omit<
+  OpenAiResponsesExecutorOptions,
   "modelId"
 > &
   MantleAuthOptions & {
     modelId?: string;
   };
 
-export class BedrockMantleExecutor extends OpenAiChatExecutor {
-  constructor(options: BedrockMantleExecutorOptions = {}) {
-    super(BedrockMantleExecutor.resolveOptions(options));
+export class BedrockMantleResponsesExecutor extends OpenAiResponsesExecutor {
+  constructor(options: BedrockMantleResponsesExecutorOptions = {}) {
+    super(BedrockMantleResponsesExecutor.resolveOptions(options));
   }
 
   private static resolveOptions(
-    options: BedrockMantleExecutorOptions,
-  ): OpenAiChatExecutorOptions {
-    const resolved: OpenAiChatExecutorOptions = {
+    options: BedrockMantleResponsesExecutorOptions,
+  ): OpenAiResponsesExecutorOptions {
+    const resolved: OpenAiResponsesExecutorOptions = {
       ...options,
       modelProvider: options.modelProvider ?? "aws-bedrock-mantle",
       modelId: options.modelId ?? "openai.gpt-oss-20b",

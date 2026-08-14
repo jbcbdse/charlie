@@ -287,6 +287,9 @@ export class LlmSpansApi {
     if (msg.role === "tool") {
       return { content: msg.content, role: "tool" };
     }
+    if (msg.role === "reasoning") {
+      return { content: msg.content ?? "", role: "reasoning" };
+    }
     return {
       content: "Unknown message role",
       role: "unknown",

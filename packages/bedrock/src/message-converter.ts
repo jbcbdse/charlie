@@ -7,7 +7,9 @@ export class MessageConverter {
     this.toolsSupported = options.toolsSupported ?? true;
   }
   public toBedrockMessages(messages: ChatMessage[]): Message[] {
-    const bedrockMessages = messages.map(this.toBedrockMessage.bind(this));
+    const bedrockMessages = messages
+      .filter((msg) => msg.role !== "reasoning")
+      .map(this.toBedrockMessage.bind(this));
     return this.normalizeBedrockMessages(bedrockMessages);
   }
 
