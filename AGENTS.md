@@ -14,6 +14,7 @@ packages/
   bedrock/         — BedrockChatExecutor, Bedrock embedding generators  (@jbcbdse/charlie-bedrock)
   bedrock-mantle/  — BedrockMantleExecutor (OpenAI-compatible Mantle)   (@jbcbdse/charlie-bedrock-mantle)
   openai/          — OpenAiChatExecutor, GrokExecutor, OAI embeddings  (@jbcbdse/charlie-openai)
+  ollama/          — OllamaExecutor (OpenAI-compatible Ollama)          (@jbcbdse/charlie-ollama)
   google/          — GeminiExecutor                                     (@jbcbdse/charlie-google)
   datadog/         — LlmSpansApi (subscribes to events, sends spans)   (@jbcbdse/charlie-datadog)
   examples/        — REPL, HTTP server, e2e tests (not published)

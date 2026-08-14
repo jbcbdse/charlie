@@ -109,6 +109,14 @@ describe("Per-Module Response", () => {
       "The response indicates that the answer is 4",
     );
   });
+
+  test("charlie-ollama via ollama", async () => {
+    const { data } = await chat({
+      message: "Say hello and tell me your name",
+      agent: "ollama",
+    });
+    await assertJudge(data.response, CRITERIA);
+  }, 180_000);
 });
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ import { CurrentTimeTool } from "../tools/current-time.tool";
 import { GeminiExecutor } from "@jbcbdse/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
 import { BedrockMantleExecutor } from "@jbcbdse/charlie-bedrock-mantle";
+import { OllamaExecutor } from "@jbcbdse/charlie-ollama";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
 import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
@@ -86,7 +87,8 @@ type AvailableAgent =
   | "mantle-gpt-oss"
   | "mantle-deepseek"
   | "mantle-glm"
-  | "mantle-grok";
+  | "mantle-grok"
+  | "ollama";
 const agents: Record<AvailableAgent, ChatAgent> = {
   claude: new AiChatAgent({
     chatExecutor: new BedrockChatExecutor({
@@ -200,6 +202,13 @@ const agents: Record<AvailableAgent, ChatAgent> = {
         process.env.AWS_DEFAULT_REGION ||
         "us-east-1"
       }.api.aws/openai/v1`,
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  ollama: new AiChatAgent({
+    chatExecutor: new OllamaExecutor({
+      modelId: "qwen3.6:35b-a3b",
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,
