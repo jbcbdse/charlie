@@ -59,6 +59,49 @@ describe("MantleMessagesConverter", () => {
     ]);
   });
 
+  it("merges consecutive same-role turns", () => {
+    expect(
+      converter.toMessages([
+        { role: "user", content: "one" },
+        { role: "user", content: "two" },
+      ]),
+    ).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "one" },
+          { type: "text", text: "two" },
+        ],
+      },
+    ]);
+    expect(
+      converter.toMessages([
+        {
+          role: "tool",
+          name: "calc",
+          toolCallId: "t1",
+          content: "2",
+          returnDirect: false,
+          status: "success",
+        },
+        { role: "user", content: "thanks" },
+      ]),
+    ).toEqual([
+      {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: "t1",
+            content: "2",
+            is_error: false,
+          },
+          { type: "text", text: "thanks" },
+        ],
+      },
+    ]);
+  });
+
   it("parses thinking, text, and tool_use from a response", () => {
     expect(
       converter.fromResponse([

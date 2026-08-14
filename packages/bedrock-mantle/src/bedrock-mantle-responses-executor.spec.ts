@@ -91,6 +91,10 @@ describe("BedrockMantleMessagesExecutor", () => {
       { role: "reasoning", content: "hmm", signature: "sig" },
       { role: "assistant", content: "hello" },
     ]);
+    expect(result.responseMessage).toEqual({
+      role: "assistant",
+      content: "hello",
+    });
     expect(result.usage).toEqual({
       inputTokens: 2,
       outputTokens: 3,

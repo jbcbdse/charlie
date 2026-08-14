@@ -43,6 +43,7 @@ describe("OpenAiResponsesExecutor", () => {
           encryptedContent: "prev",
         },
         { role: "reasoning", content: "anthropic-only" },
+        { role: "reasoning", encryptedContent: "no-id" },
         {
           role: "tool_call",
           toolCalls: [

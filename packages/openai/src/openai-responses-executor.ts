@@ -70,11 +70,15 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       timeMs: Date.now() - startMs,
     });
     const responseMessages = this.outputToChatMessages(data.output);
-    return {
-      responseMessage: responseMessages.at(-1) ?? {
-        role: "assistant",
+    const responseMessage = [...responseMessages]
+      .reverse()
+      .find((m) => m.role !== "reasoning") ??
+      responseMessages.at(-1) ?? {
+        role: "assistant" as const,
         content: data.output_text || "",
-      },
+      };
+    return {
+      responseMessage,
       responseMessages:
         responseMessages.length > 0
           ? responseMessages
@@ -103,10 +107,10 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
         continue;
       }
       if (msg.role === "reasoning") {
-        if (!msg.encryptedContent) continue;
+        if (!msg.encryptedContent || !msg.id) continue;
         items.push({
           type: "reasoning",
-          id: msg.id || "",
+          id: msg.id,
           summary: [],
           encrypted_content: msg.encryptedContent,
         });

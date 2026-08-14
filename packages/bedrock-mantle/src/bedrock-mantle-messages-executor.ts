@@ -20,12 +20,14 @@ export type BedrockMantleMessagesExecutorOptions = MantleAuthOptions & {
   baseURL?: string;
   anthropicClient?: AnthropicBedrockMantle;
   messageConverter?: MantleMessagesConverter;
+  thinking?: { type: "enabled"; budget_tokens: number } | { type: "adaptive" };
 };
 
 export class BedrockMantleMessagesExecutor implements ChatExecutor {
   public modelProvider: string;
   public modelId: string;
   private maxTokens: number;
+  private thinking: BedrockMantleMessagesExecutorOptions["thinking"];
   private client: AnthropicBedrockMantle;
   private messageConverter: MantleMessagesConverter;
 
@@ -33,14 +35,19 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
     this.modelProvider = options.modelProvider ?? "aws-bedrock-mantle";
     this.modelId = options.modelId ?? "anthropic.claude-haiku-4-5";
     this.maxTokens = options.maxTokens ?? 8192;
+    this.thinking = options.thinking;
     this.messageConverter =
       options.messageConverter ?? new MantleMessagesConverter();
+    const apiKey =
+      typeof options.apiKey === "string"
+        ? options.apiKey
+        : process.env.AWS_BEARER_TOKEN_BEDROCK || undefined;
     this.client =
       options.anthropicClient ??
       new AnthropicBedrockMantle({
         awsRegion: resolveMantleRegion(options),
-        awsProfile: resolveMantleProfile(options),
-        apiKey: typeof options.apiKey === "string" ? options.apiKey : undefined,
+        apiKey,
+        awsProfile: apiKey ? undefined : resolveMantleProfile(options),
         baseURL:
           options.baseURL ?? bedrockMantleBaseURL("anthropic", options.region),
       });
@@ -56,6 +63,7 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
       max_tokens: this.maxTokens,
       system: context.systemPrompt,
       messages: this.messageConverter.toMessages(messages),
+      thinking: this.thinking,
       tools: tools?.map((tool) => ({
         name: tool.name,
         description: tool.description,
@@ -79,11 +87,15 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
       timeMs: Date.now() - startMs,
     });
     const responseMessages = this.messageConverter.fromResponse(data.content);
-    return {
-      responseMessage: responseMessages.at(-1) ?? {
-        role: "assistant",
+    const responseMessage = [...responseMessages]
+      .reverse()
+      .find((m) => m.role !== "reasoning") ??
+      responseMessages.at(-1) ?? {
+        role: "assistant" as const,
         content: "",
-      },
+      };
+    return {
+      responseMessage,
       responseMessages:
         responseMessages.length > 0
           ? responseMessages

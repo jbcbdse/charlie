@@ -21,8 +21,13 @@ interface ToolResultBlock {
   content: string;
   is_error?: boolean;
 }
+interface RedactedThinkingBlock {
+  type: "redacted_thinking";
+  data: string;
+}
 type ContentBlockParam =
   | ThinkingBlock
+  | RedactedThinkingBlock
   | TextBlock
   | ToolUseBlock
   | ToolResultBlock;
@@ -38,6 +43,7 @@ interface ResponseBlock {
   id?: string;
   name?: string;
   input?: unknown;
+  data?: string;
 }
 
 export class MantleMessagesConverter {
@@ -77,6 +83,11 @@ export class MantleMessagesConverter {
             thinking: msg.content,
             signature: msg.signature,
           });
+        } else if (!msg.content && msg.signature) {
+          assistantBlocks.push({
+            type: "redacted_thinking",
+            data: msg.signature,
+          });
         }
         continue;
       }
@@ -114,7 +125,7 @@ export class MantleMessagesConverter {
     }
     flushAssistant();
     flushToolResults();
-    return result;
+    return mergeTurns(result);
   }
 
   public fromResponse(content: ResponseBlock[]): ChatMessage[] {
@@ -140,6 +151,14 @@ export class MantleMessagesConverter {
         });
         continue;
       }
+      if (block.type === "redacted_thinking" && block.data) {
+        flushToolCalls();
+        messages.push({
+          role: "reasoning",
+          signature: block.data,
+        });
+        continue;
+      }
       if (block.type === "text" && block.text) {
         flushToolCalls();
         messages.push({ role: "assistant", content: block.text });
@@ -159,6 +178,28 @@ export class MantleMessagesConverter {
     flushToolCalls();
     return messages;
   }
+}
+
+function mergeTurns(messages: MantleMessageParam[]): MantleMessageParam[] {
+  const merged: MantleMessageParam[] = [];
+  for (const msg of messages) {
+    const last = merged.at(-1);
+    if (last && last.role === msg.role) {
+      last.content = [...asBlocks(last.content), ...asBlocks(msg.content)];
+    } else {
+      merged.push({
+        role: msg.role,
+        content: msg.content,
+      });
+    }
+  }
+  return merged;
+}
+
+function asBlocks(content: string | ContentBlockParam[]): ContentBlockParam[] {
+  return typeof content === "string"
+    ? [{ type: "text", text: content }]
+    : content;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
