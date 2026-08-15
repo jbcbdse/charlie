@@ -96,6 +96,7 @@ export function chatHandler(
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       const writeEvent = (event: string, data: unknown) => {
+        if (res.writableEnded || res.destroyed) return;
         res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
       try {

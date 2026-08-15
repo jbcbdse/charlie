@@ -87,9 +87,9 @@ export class OpenAiChatExecutor implements ChatExecutor {
           total_tokens: number;
         }
       | undefined;
-    const chunks: unknown[] = [];
+    let lastChunk: unknown;
     for await (const part of stream) {
-      chunks.push(part);
+      lastChunk = part;
       if (part.usage) {
         usage = part.usage;
       }
@@ -125,10 +125,16 @@ export class OpenAiChatExecutor implements ChatExecutor {
         });
       }
       for (const toolCall of delta.tool_calls ?? []) {
-        const index = toolCall.index ?? 0;
+        const index =
+          toolCall.index ??
+          (toolCall.id
+            ? ([...toolAcc.entries()].find(
+                ([, acc]) => acc.id === toolCall.id,
+              )?.[0] ?? toolAcc.size)
+            : 0);
         const acc = toolAcc.get(index) ?? { id: "", name: "", arguments: "" };
         if (toolCall.id) acc.id = toolCall.id;
-        if (toolCall.function?.name) acc.name += toolCall.function.name;
+        if (toolCall.function?.name) acc.name ||= toolCall.function.name;
         if (toolCall.function?.arguments) {
           acc.arguments += toolCall.function.arguments;
         }
@@ -149,14 +155,14 @@ export class OpenAiChatExecutor implements ChatExecutor {
     }
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: chunks[chunks.length - 1],
+      response: lastChunk,
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    const msg = this.accumulatedToChatMessage(content, toolAcc);
+    const responseMessages = this.accumulatedToChatMessages(content, toolAcc);
     return {
-      responseMessage: msg,
-      responseMessages: [msg],
+      responseMessage: responseMessages[responseMessages.length - 1],
+      responseMessages,
       usage: usage && {
         inputTokens: usage.prompt_tokens,
         outputTokens: usage.completion_tokens,
@@ -165,12 +171,16 @@ export class OpenAiChatExecutor implements ChatExecutor {
     };
   }
 
-  private accumulatedToChatMessage(
+  private accumulatedToChatMessages(
     content: string,
     toolAcc: Map<number, { id: string; name: string; arguments: string }>,
-  ): ChatMessage {
+  ): ChatMessage[] {
+    const messages: ChatMessage[] = [];
+    if (content) {
+      messages.push({ role: "assistant", content, name: undefined });
+    }
     if (toolAcc.size > 0) {
-      return {
+      messages.push({
         role: "tool_call",
         toolCalls: [...toolAcc.entries()]
           .sort(([a], [b]) => a - b)
@@ -182,13 +192,11 @@ export class OpenAiChatExecutor implements ChatExecutor {
             type: "function" as const,
             id: toolCall.id,
           })),
-      };
+      });
     }
-    return {
-      role: "assistant",
-      content,
-      name: undefined,
-    };
+    return messages.length > 0
+      ? messages
+      : [{ role: "assistant", content, name: undefined }];
   }
 
   private toOpenAiMessages(messages: ChatMessage[]): OpenAiChatMessage[] {

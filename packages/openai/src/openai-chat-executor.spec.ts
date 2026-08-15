@@ -135,6 +135,104 @@ describe("OpenAiChatExecutor streaming", () => {
     });
   });
 
+  it("keeps parallel tool calls that omit index but have distinct ids", async () => {
+    const producer = new EventProducer();
+    const create = jest.fn().mockResolvedValue(
+      asyncChunks([
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    id: "c1",
+                    function: { name: "A", arguments: "{}" },
+                  },
+                  {
+                    id: "c2",
+                    function: { name: "B", arguments: "{}" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ]),
+    );
+    const executor = new OpenAiChatExecutor({
+      modelId: "test-model",
+      openAiClient: {
+        chat: { completions: { create } },
+      } as never,
+    });
+    const result = await executor.execute({
+      messages: [{ role: "user", content: "go" }],
+      context: context(producer),
+    });
+    expect(result.responseMessage).toEqual({
+      role: "tool_call",
+      toolCalls: [
+        {
+          id: "c1",
+          type: "function",
+          function: { name: "A", arguments: {} },
+        },
+        {
+          id: "c2",
+          type: "function",
+          function: { name: "B", arguments: {} },
+        },
+      ],
+    });
+  });
+
+  it("keeps streamed preamble text when a tool call follows", async () => {
+    const producer = new EventProducer();
+    const create = jest.fn().mockResolvedValue(
+      asyncChunks([
+        { choices: [{ delta: { content: "Let me check. " } }] },
+        {
+          choices: [
+            {
+              delta: {
+                tool_calls: [
+                  {
+                    index: 0,
+                    id: "c1",
+                    function: { name: "CalculatorTool", arguments: "{}" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ]),
+    );
+    const executor = new OpenAiChatExecutor({
+      modelId: "test-model",
+      openAiClient: {
+        chat: { completions: { create } },
+      } as never,
+    });
+    const result = await executor.execute({
+      messages: [{ role: "user", content: "calc" }],
+      context: context(producer),
+    });
+    expect(result.responseMessages).toEqual([
+      { role: "assistant", content: "Let me check. ", name: undefined },
+      {
+        role: "tool_call",
+        toolCalls: [
+          {
+            id: "c1",
+            type: "function",
+            function: { name: "CalculatorTool", arguments: {} },
+          },
+        ],
+      },
+    ]);
+  });
+
   it("emits reasoning_content as thinking and keeps it out of assistant content", async () => {
     const producer = new EventProducer();
     const chunks: StreamChunk[] = [];

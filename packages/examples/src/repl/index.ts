@@ -288,6 +288,7 @@ async function handleChat(input: string): Promise<string> {
       }
     });
     const response = await run;
+    process.stdout.write("\n");
     messageHistory.push(
       ...response.responseMessages.filter((msg) => msg.role === "assistant"),
     );

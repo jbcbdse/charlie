@@ -116,7 +116,7 @@ export class MessageConverter {
           },
         ];
       }
-      throw new Error(`Unknown part type: ${JSON.stringify(part)}`);
+      return [];
     });
   }
 }

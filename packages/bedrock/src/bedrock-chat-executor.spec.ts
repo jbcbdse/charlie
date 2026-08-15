@@ -149,6 +149,38 @@ describe("BedrockChatExecutor streaming", () => {
     expect(chunks).toEqual([{ type: "text", text: "PONG" }]);
   });
 
+  it("does not fall back after the stream has already started", async () => {
+    const producer = new EventProducer();
+    const converse = jest.fn();
+    const converseStream = jest.fn().mockResolvedValue({
+      stream: (async function* () {
+        yield { contentBlockDelta: { delta: { text: "partial" } } };
+        throw new Error(
+          "This model doesn't support tool use in streaming mode.",
+        );
+      })(),
+    });
+    const executor = new BedrockChatExecutor({
+      modelId: "us.meta.llama4-scout-17b-instruct-v1:0",
+      client: { converseStream, converse } as never,
+    });
+    await expect(
+      executor.execute({
+        messages: [{ role: "user", content: "hi" }],
+        tools: [
+          {
+            name: "CalculatorTool",
+            description: "calc",
+            jsonSchema: { type: "object" },
+            handle: async () => "ok",
+          },
+        ],
+        context: context(producer),
+      }),
+    ).rejects.toThrow(/streaming mode/);
+    expect(converse).not.toHaveBeenCalled();
+  });
+
   it("emits reasoningContent as thinking and keeps it out of assistant content", async () => {
     const producer = new EventProducer();
     const chunks: StreamChunk[] = [];

@@ -62,7 +62,7 @@ for await (const { chunk } of run) {
 const result = await run;
 ```
 
-Executors always use the provider stream API, accumulate the full messages, and return the same `ChatAgentGetResponseOutput` as before. They emit `chat:stream:chunk` (`EventName.ChatStreamChunk`) for append-only slices: `text`, `thinking`, or `tool_call`. Thinking tokens are stream-only — never concatenated into `MessageAssistant.content`.
+Executors always use the provider stream API, accumulate the full messages, and return the same `ChatAgentGetResponseOutput` as before. They emit `chat:stream:chunk` (`EventName.ChatStreamChunk`) for append-only slices: `text`, `thinking`, or `tool_call`. Thinking tokens are stream-only — never concatenated into `MessageAssistant.content`. On `tool_call` chunks, `id` and `name` are last-wins (often only on the first slice); `argumentsText` is append-only.
 
 **Tools** extend `BaseTool` with a Zod schema and an async `handler`. Setting `returnDirect = true` on a tool causes the agent to stop the loop and return the tool result directly without re-entering the LLM — useful for side-effect tools like account deletion.
 

@@ -25,7 +25,11 @@ export function createChatRun(
 
   const promise = new Promise<ChatAgentGetResponseOutput>((resolve, reject) => {
     queueMicrotask(() => {
-      work().then(resolve, reject);
+      try {
+        work().then(resolve, reject);
+      } catch (err) {
+        reject(err);
+      }
     });
   });
 
@@ -45,12 +49,20 @@ export function createChatRun(
   run.on = <T extends EventName>(eventName: T, listener: Listener<T>) => {
     const wrapped: Listener<T> = (event, name) => {
       if (event.context.runId !== runId) return;
-      listener(event, name);
+      try {
+        listener(event, name);
+      } catch {
+        // Consumer faults must not reject the run.
+      }
     };
     let byListener = wrappers.get(eventName);
     if (!byListener) {
       byListener = new Map();
       wrappers.set(eventName, byListener);
+    }
+    const previous = byListener.get(listener as Listener<EventName>);
+    if (previous) {
+      subscriber.off(eventName, previous);
     }
     byListener.set(
       listener as Listener<EventName>,
@@ -71,18 +83,24 @@ export function createChatRun(
   run[Symbol.asyncIterator] = async function* () {
     const queue: EventChatStreamChunk[] = [];
     let settled = false;
+    let failure: unknown;
     let notify: (() => void) | undefined;
     const onChunk: Listener<EventName.ChatStreamChunk> = (event) => {
       queue.push(event);
       notify?.();
     };
     run.on(EventName.ChatStreamChunk, onChunk);
-    void promise
-      .finally(() => {
+    void promise.then(
+      () => {
         settled = true;
         notify?.();
-      })
-      .catch(() => undefined);
+      },
+      (err: unknown) => {
+        failure = err;
+        settled = true;
+        notify?.();
+      },
+    );
     try {
       while (!settled || queue.length > 0) {
         if (queue.length > 0) {
@@ -94,6 +112,7 @@ export function createChatRun(
           notify = resolve;
         });
       }
+      if (failure !== undefined) throw failure;
     } finally {
       run.off(EventName.ChatStreamChunk, onChunk);
     }

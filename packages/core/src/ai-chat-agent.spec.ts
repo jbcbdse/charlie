@@ -730,6 +730,43 @@ describe("AiChatAgent", () => {
       );
     });
 
+    it("does not reject the run when a listener throws", async () => {
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["ok"]),
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      run.on(EventName.ChatStreamChunk, () => {
+        throw new Error("consumer fault");
+      });
+      await expect(run).resolves.toMatchObject({
+        responseMessage: { role: "assistant", content: "ok" },
+      });
+    });
+
+    it("replaces a duplicate .on registration instead of leaking", async () => {
+      const producer = new EventProducer();
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["x"]),
+        eventProducer: producer,
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      const heard: string[] = [];
+      const listener = (): void => {
+        heard.push("hit");
+      };
+      run.on(EventName.ChatStreamChunk, listener);
+      run.on(EventName.ChatStreamChunk, listener);
+      await run;
+      expect(heard).toEqual(["hit"]);
+      expect(producer.emitter.listenerCount(EventName.ChatStreamChunk)).toBe(0);
+    });
+
     it("stamps toolName and toolCallId on ToolProgress and Log", async () => {
       const producer = new EventProducer();
       const localAgent = new AiChatAgent({

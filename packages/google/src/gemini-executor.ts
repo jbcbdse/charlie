@@ -48,6 +48,7 @@ export class GeminiExecutor implements ChatExecutor {
       request: req,
     });
     const streamed = await this.model.generateContentStream(req);
+    let toolIndex = 0;
     for await (const chunk of streamed.stream) {
       const parts = chunk.candidates?.[0]?.content?.parts ?? [];
       for (const part of parts) {
@@ -75,7 +76,7 @@ export class GeminiExecutor implements ChatExecutor {
             modelProvider: this.modelProvider,
             chunk: {
               type: "tool_call",
-              index: 0,
+              index: toolIndex++,
               name: part.functionCall.name,
               argumentsText: JSON.stringify(part.functionCall.args ?? {}),
             },

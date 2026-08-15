@@ -24,6 +24,7 @@ export class BedrockChatExecutor implements ChatExecutor {
   private toolPromptGenerator: ToolPromptGenerator;
   private messageConverter: MessageConverter;
   private toolsSupported: boolean;
+  private streamToolsUnsupported = false;
 
   constructor(options: {
     client?: BedrockRuntime;
@@ -123,35 +124,41 @@ export class BedrockChatExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
+    if (this.streamToolsUnsupported && request.toolConfig) {
+      return this.executeNonStream(request, context, chatExecutorStartMs);
+    }
+    let stream;
     try {
       const response = await this.client.converseStream(request);
-      if (!response.stream) {
-        return {
-          responseMessage: { role: "assistant", content: "" },
-          responseMessages: [{ role: "assistant", content: "" }],
-        };
-      }
-      const { responseMessages, usage } = await this.consumeStream(
-        response.stream,
-        context,
-      );
-      context.eventProducer.emit(EventName.ChatRawResponse, {
-        context,
-        response: { usage },
-        modelId: this.modelId,
-        timeMs: Date.now() - chatExecutorStartMs,
-      });
-      return {
-        responseMessage: responseMessages[responseMessages.length - 1],
-        responseMessages,
-        usage,
-      };
+      stream = response.stream;
     } catch (err) {
       if (request.toolConfig && isStreamToolsUnsupported(err)) {
+        this.streamToolsUnsupported = true;
         return this.executeNonStream(request, context, chatExecutorStartMs);
       }
       throw err;
     }
+    if (!stream) {
+      return {
+        responseMessage: { role: "assistant", content: "" },
+        responseMessages: [{ role: "assistant", content: "" }],
+      };
+    }
+    const { responseMessages, usage } = await this.consumeStream(
+      stream,
+      context,
+    );
+    context.eventProducer.emit(EventName.ChatRawResponse, {
+      context,
+      response: { usage },
+      modelId: this.modelId,
+      timeMs: Date.now() - chatExecutorStartMs,
+    });
+    return {
+      responseMessage: responseMessages[responseMessages.length - 1],
+      responseMessages,
+      usage,
+    };
   }
 
   private async executeNonStream(
@@ -400,8 +407,13 @@ export class BedrockChatExecutor implements ChatExecutor {
 }
 
 function isStreamToolsUnsupported(err: unknown): boolean {
+  const name =
+    err && typeof err === "object" && "name" in err ? String(err.name) : "";
   const message = err instanceof Error ? err.message : String(err);
-  return /doesn't support tool use in streaming mode/i.test(message);
+  return (
+    /doesn't support tool use in streaming mode/i.test(message) ||
+    (name === "ValidationException" && /streaming mode/i.test(message))
+  );
 }
 
 function parseArguments(raw: string): Record<string, unknown> {
