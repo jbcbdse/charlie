@@ -33,7 +33,9 @@ export function createChatRun(
     });
   });
 
+  let settled = false;
   const offAll = () => {
+    settled = true;
     for (const [eventName, listeners] of wrappers) {
       for (const wrapped of listeners.values()) {
         subscriber.off(eventName, wrapped);
@@ -47,6 +49,7 @@ export function createChatRun(
   const run = promise as ChatRun;
 
   run.on = <T extends EventName>(eventName: T, listener: Listener<T>) => {
+    if (settled) return;
     const wrapped: Listener<T> = (event, name) => {
       if (event.context.runId !== runId) return;
       try {
@@ -82,7 +85,8 @@ export function createChatRun(
 
   run[Symbol.asyncIterator] = async function* () {
     const queue: EventChatStreamChunk[] = [];
-    let settled = false;
+    let done = false;
+    let failed = false;
     let failure: unknown;
     let notify: (() => void) | undefined;
     const onChunk: Listener<EventName.ChatStreamChunk> = (event) => {
@@ -92,17 +96,18 @@ export function createChatRun(
     run.on(EventName.ChatStreamChunk, onChunk);
     void promise.then(
       () => {
-        settled = true;
+        done = true;
         notify?.();
       },
       (err: unknown) => {
         failure = err;
-        settled = true;
+        failed = true;
+        done = true;
         notify?.();
       },
     );
     try {
-      while (!settled || queue.length > 0) {
+      while (!done || queue.length > 0) {
         if (queue.length > 0) {
           const next = queue.shift();
           if (next) yield next;
@@ -112,7 +117,7 @@ export function createChatRun(
           notify = resolve;
         });
       }
-      if (failure !== undefined) throw failure;
+      if (failed) throw failure;
     } finally {
       run.off(EventName.ChatStreamChunk, onChunk);
     }

@@ -16,6 +16,7 @@ import {
   eventProducer as globalEventProducer,
 } from "./event-producer";
 import { EventSubscriber } from "./event-subscriber";
+import { createChatRun } from "./chat-run";
 import { z } from "zod";
 
 class CalculatorTool extends BaseTool {
@@ -765,6 +766,35 @@ describe("AiChatAgent", () => {
       await run;
       expect(heard).toEqual(["hit"]);
       expect(producer.emitter.listenerCount(EventName.ChatStreamChunk)).toBe(0);
+    });
+
+    it("ignores .on after the run settles", async () => {
+      const producer = new EventProducer();
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["ok"]),
+        eventProducer: producer,
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      await run;
+      run.on(EventName.ChatStreamChunk, () => undefined);
+      expect(producer.emitter.listenerCount(EventName.ChatStreamChunk)).toBe(0);
+    });
+
+    it("async iterator throws when the run rejects with undefined", async () => {
+      const producer = new EventProducer();
+      const run = createChatRun(producer, "run", () =>
+        Promise.reject(undefined),
+      );
+      await expect(
+        (async () => {
+          for await (const event of run) {
+            void event;
+          }
+        })(),
+      ).rejects.toBeUndefined();
     });
 
     it("stamps toolName and toolCallId on ToolProgress and Log", async () => {

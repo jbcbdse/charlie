@@ -12,7 +12,7 @@ export class MessageConverter {
   }
   private condense(contentObjects: Content[]): Content[] {
     return contentObjects.reduce((acc, content) => {
-      const last = acc.at(-1);
+      const last = acc[acc.length - 1];
       if (last?.role !== content.role) {
         acc.push(content);
       } else {
@@ -86,37 +86,37 @@ export class MessageConverter {
   }
 
   responseContentChatMessages(content: Content): ChatMessage[] {
-    return content.parts.flatMap((part): ChatMessage[] => {
+    const messages: ChatMessage[] = [];
+    for (const part of content.parts ?? []) {
       if ("thought" in part && part.thought) {
-        return [];
+        continue;
       }
       if (part.text) {
-        return [
-          {
-            role: "assistant",
-            content: part.text,
-          },
-        ];
+        const last = messages[messages.length - 1];
+        if (last?.role === "assistant") {
+          last.content += part.text;
+        } else {
+          messages.push({ role: "assistant", content: part.text });
+        }
+        continue;
       }
       if (part.functionCall) {
-        return [
-          {
-            role: "tool_call",
-            toolCalls: [
-              {
-                id: "1",
-                type: "function",
-                function: {
-                  name: part.functionCall.name,
-                  // @ts-expect-error Google says `object` which should be assignable
-                  arguments: part.functionCall.args,
-                },
+        messages.push({
+          role: "tool_call",
+          toolCalls: [
+            {
+              id: "1",
+              type: "function",
+              function: {
+                name: part.functionCall.name,
+                // @ts-expect-error Google says `object` which should be assignable
+                arguments: part.functionCall.args,
               },
-            ],
-          },
-        ];
+            },
+          ],
+        });
       }
-      return [];
-    });
+    }
+    return messages;
   }
 }

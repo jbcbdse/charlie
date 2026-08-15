@@ -98,9 +98,30 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
           argumentsText: event.delta,
         });
       }
+      if (event.type === "error") {
+        throw new Error(
+          "message" in event && typeof event.message === "string"
+            ? event.message
+            : "Responses stream error",
+        );
+      }
+      if (event.type === "response.failed") {
+        throw new Error(
+          event.response.error?.message || "Responses request failed",
+        );
+      }
+      if (event.type === "response.incomplete") {
+        throw new Error(
+          event.response.incomplete_details?.reason ||
+            "Responses request incomplete",
+        );
+      }
       if (event.type === "response.completed") {
         completed = event.response;
       }
+    }
+    if (!completed) {
+      throw new Error("Responses stream ended without a completed response");
     }
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,

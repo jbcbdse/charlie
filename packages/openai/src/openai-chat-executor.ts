@@ -187,7 +187,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
           .map(([, toolCall]) => ({
             function: {
               name: toolCall.name,
-              arguments: parseArguments(toolCall.arguments),
+              arguments: this.parseArguments(toolCall.arguments),
             },
             type: "function" as const,
             id: toolCall.id,
@@ -249,15 +249,15 @@ export class OpenAiChatExecutor implements ChatExecutor {
         throw new Error(`Unknown message role: ${(msg as any)?.role}`);
       });
   }
-}
 
-function parseArguments(raw: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(raw || "{}");
-    return parsed !== null && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
+  private parseArguments(raw: string): Record<string, unknown> {
+    try {
+      const parsed: unknown = JSON.parse(raw || "{}");
+      return parsed !== null && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
   }
 }

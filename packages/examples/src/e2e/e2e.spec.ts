@@ -45,7 +45,7 @@ async function chat(body: {
 }
 
 function isModelUnavailable(error?: string): boolean {
-  return /not available for this account|permission_error|access_denied/i.test(
+  return /not available for this account|permission_error|access_denied|access denied|legacy/i.test(
     error ?? "",
   );
 }
@@ -216,6 +216,7 @@ describe("Bedrock Model Smoke Tests", () => {
       message: "Reply with exactly the word PONG",
       agent,
     });
+    if (skipIfUnavailable(agent, status, data.error)) return;
     expect(status).toBe(200);
     expect(typeof data.response).toBe("string");
     expect(data.response.trim().length).toBeGreaterThan(0);

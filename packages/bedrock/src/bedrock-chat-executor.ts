@@ -132,7 +132,7 @@ export class BedrockChatExecutor implements ChatExecutor {
       const response = await this.client.converseStream(request);
       stream = response.stream;
     } catch (err) {
-      if (request.toolConfig && isStreamToolsUnsupported(err)) {
+      if (request.toolConfig && this.isStreamToolsUnsupported(err)) {
         this.streamToolsUnsupported = true;
         return this.executeNonStream(request, context, chatExecutorStartMs);
       }
@@ -302,10 +302,22 @@ export class BedrockChatExecutor implements ChatExecutor {
       const start = event.contentBlockStart;
       if (start?.start?.toolUse) {
         const index = start.contentBlockIndex ?? 0;
-        tools.set(index, {
+        const acc = {
           id: start.start.toolUse.toolUseId || "",
           name: start.start.toolUse.name || "",
           arguments: "",
+        };
+        tools.set(index, acc);
+        context.eventProducer.emit(EventName.ChatStreamChunk, {
+          context,
+          modelId: this.modelId,
+          modelProvider: this.modelProvider,
+          chunk: {
+            type: "tool_call",
+            index,
+            id: acc.id,
+            name: acc.name,
+          },
         });
       }
       const delta = event.contentBlockDelta?.delta;
@@ -370,7 +382,7 @@ export class BedrockChatExecutor implements ChatExecutor {
             type: "function" as const,
             function: {
               name: toolCall.name,
-              arguments: parseArguments(toolCall.arguments),
+              arguments: this.parseArguments(toolCall.arguments),
             },
           })),
       });
@@ -404,25 +416,25 @@ export class BedrockChatExecutor implements ChatExecutor {
     // this might need to be filled in later
     return !modelId.startsWith("amazon.titan");
   }
-}
 
-function isStreamToolsUnsupported(err: unknown): boolean {
-  const name =
-    err && typeof err === "object" && "name" in err ? String(err.name) : "";
-  const message = err instanceof Error ? err.message : String(err);
-  return (
-    /doesn't support tool use in streaming mode/i.test(message) ||
-    (name === "ValidationException" && /streaming mode/i.test(message))
-  );
-}
+  private isStreamToolsUnsupported(err: unknown): boolean {
+    const name =
+      err && typeof err === "object" && "name" in err ? String(err.name) : "";
+    const message = err instanceof Error ? err.message : String(err);
+    return (
+      /doesn't support tool use in streaming mode/i.test(message) ||
+      (name === "ValidationException" && /streaming mode/i.test(message))
+    );
+  }
 
-function parseArguments(raw: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(raw || "{}");
-    return parsed !== null && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
+  private parseArguments(raw: string): Record<string, unknown> {
+    try {
+      const parsed: unknown = JSON.parse(raw || "{}");
+      return parsed !== null && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
   }
 }

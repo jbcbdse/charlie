@@ -180,6 +180,9 @@ export interface EventTypeMap {
 
 export class EventProducer {
   public emitter = new EventEmitter();
+  constructor() {
+    this.emitter.setMaxListeners(0);
+  }
   public emit<T extends EventName>(eventName: T, event: EventTypeMap[T]): void {
     this.emitter.emit(eventName, event, eventName);
   }

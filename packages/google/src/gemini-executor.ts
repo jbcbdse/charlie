@@ -92,12 +92,13 @@ export class GeminiExecutor implements ChatExecutor {
       timeMs: Date.now() - startMs,
     });
     const responseMessages = this.messageConverter.responseContentChatMessages(
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      aggregated.candidates![0].content,
+      aggregated.candidates?.[0]?.content ?? { role: "model", parts: [] },
     );
+    if (responseMessages.length === 0) {
+      responseMessages.push({ role: "assistant", content: "" });
+    }
     return {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      responseMessage: responseMessages.at(-1)!,
+      responseMessage: responseMessages[responseMessages.length - 1],
       responseMessages,
       usage: aggregated.usageMetadata && {
         inputTokens:

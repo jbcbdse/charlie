@@ -244,4 +244,43 @@ describe("OpenAiResponsesExecutor", () => {
       { role: "assistant", content: "4" },
     ]);
   });
+
+  it("throws when the stream reports a failed response", async () => {
+    const create = jest.fn().mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield {
+          type: "response.failed",
+          response: { error: { message: "boom" } },
+        };
+      },
+    });
+    const executor = new OpenAiResponsesExecutor({
+      modelId: "gpt-5.4",
+      openAiClient: { responses: { create } } as unknown as OpenAI,
+    });
+    await expect(
+      executor.execute({
+        context: context(),
+        messages: [{ role: "user", content: "hi" }],
+      }),
+    ).rejects.toThrow("boom");
+  });
+
+  it("throws when the stream ends without a completed response", async () => {
+    const create = jest.fn().mockResolvedValue({
+      async *[Symbol.asyncIterator]() {
+        yield { type: "response.output_text.delta", delta: "hi" };
+      },
+    });
+    const executor = new OpenAiResponsesExecutor({
+      modelId: "gpt-5.4",
+      openAiClient: { responses: { create } } as unknown as OpenAI,
+    });
+    await expect(
+      executor.execute({
+        context: context(),
+        messages: [{ role: "user", content: "hi" }],
+      }),
+    ).rejects.toThrow(/without a completed response/);
+  });
 });
