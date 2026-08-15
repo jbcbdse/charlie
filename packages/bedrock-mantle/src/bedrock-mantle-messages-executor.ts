@@ -90,7 +90,7 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
     const responseMessage = [...responseMessages]
       .reverse()
       .find((m) => m.role !== "reasoning") ??
-      responseMessages.at(-1) ?? {
+      responseMessages[responseMessages.length - 1] ?? {
         role: "assistant" as const,
         content: "",
       };

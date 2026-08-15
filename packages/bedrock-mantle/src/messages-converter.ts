@@ -125,7 +125,7 @@ export class MantleMessagesConverter {
     }
     flushAssistant();
     flushToolResults();
-    return mergeTurns(result);
+    return this.mergeTurns(result);
   }
 
   public fromResponse(content: ResponseBlock[]): ChatMessage[] {
@@ -170,7 +170,7 @@ export class MantleMessagesConverter {
           type: "function",
           function: {
             name: block.name,
-            arguments: asRecord(block.input),
+            arguments: this.asRecord(block.input),
           },
         });
       }
@@ -178,32 +178,35 @@ export class MantleMessagesConverter {
     flushToolCalls();
     return messages;
   }
-}
 
-function mergeTurns(messages: MantleMessageParam[]): MantleMessageParam[] {
-  const merged: MantleMessageParam[] = [];
-  for (const msg of messages) {
-    const last = merged.at(-1);
-    if (last && last.role === msg.role) {
-      last.content = [...asBlocks(last.content), ...asBlocks(msg.content)];
-    } else {
-      merged.push({
-        role: msg.role,
-        content: msg.content,
-      });
+  private mergeTurns(messages: MantleMessageParam[]): MantleMessageParam[] {
+    const merged: MantleMessageParam[] = [];
+    for (const msg of messages) {
+      const last = merged[merged.length - 1];
+      if (last && last.role === msg.role) {
+        last.content = [
+          ...this.asBlocks(last.content),
+          ...this.asBlocks(msg.content),
+        ];
+      } else {
+        merged.push({
+          role: msg.role,
+          content: msg.content,
+        });
+      }
     }
+    return merged;
   }
-  return merged;
-}
 
-function asBlocks(content: string | ContentBlockParam[]): ContentBlockParam[] {
-  return typeof content === "string"
-    ? [{ type: "text", text: content }]
-    : content;
-}
+  private asBlocks(content: string | ContentBlockParam[]): ContentBlockParam[] {
+    return typeof content === "string"
+      ? [{ type: "text", text: content }]
+      : content;
+  }
 
-function asRecord(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object"
-    ? (value as Record<string, unknown>)
-    : {};
+  private asRecord(value: unknown): Record<string, unknown> {
+    return value !== null && typeof value === "object"
+      ? (value as Record<string, unknown>)
+      : {};
+  }
 }
