@@ -13,6 +13,7 @@ export {
   ChatMessage,
   ChatMessageTransformer,
   MessageAssistant,
+  MessageReasoning,
   MessageSystem,
   MessageTool,
   MessageToolCall,

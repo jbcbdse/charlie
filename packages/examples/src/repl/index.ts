@@ -19,7 +19,12 @@ import { CountLettersTool } from "../tools/letter-count.tool";
 import { CurrentTimeTool } from "../tools/current-time.tool";
 import { GeminiExecutor } from "@jbcbdse/charlie-google";
 import { GrokExecutor, OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
-import { BedrockMantleExecutor } from "@jbcbdse/charlie-bedrock-mantle";
+import {
+  BedrockMantleExecutor,
+  BedrockMantleMessagesExecutor,
+  BedrockMantleResponsesExecutor,
+  bedrockMantleBaseURL,
+} from "@jbcbdse/charlie-bedrock-mantle";
 import { OllamaExecutor } from "@jbcbdse/charlie-ollama";
 import repl from "node:repl";
 import { setTimeout as sleep } from "timers/promises";
@@ -88,6 +93,10 @@ type AvailableAgent =
   | "mantle-deepseek"
   | "mantle-glm"
   | "mantle-grok"
+  | "mantle-gpt-oss-responses"
+  | "mantle-grok-responses"
+  | "mantle-gpt-5"
+  | "mantle-claude"
   | "ollama";
 const agents: Record<AvailableAgent, ChatAgent> = {
   claude: new AiChatAgent({
@@ -196,12 +205,37 @@ const agents: Record<AvailableAgent, ChatAgent> = {
   "mantle-grok": new AiChatAgent({
     chatExecutor: new BedrockMantleExecutor({
       modelId: "xai.grok-4.3",
-      // Grok on Mantle is served under /openai/v1, not /v1
-      baseURL: `https://bedrock-mantle.${
-        process.env.AWS_REGION ||
-        process.env.AWS_DEFAULT_REGION ||
-        "us-east-1"
-      }.api.aws/openai/v1`,
+      baseURL: bedrockMantleBaseURL("openai/v1"),
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  "mantle-gpt-oss-responses": new AiChatAgent({
+    chatExecutor: new BedrockMantleResponsesExecutor({
+      modelId: "openai.gpt-oss-20b",
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  "mantle-grok-responses": new AiChatAgent({
+    chatExecutor: new BedrockMantleResponsesExecutor({
+      modelId: "xai.grok-4.3",
+      baseURL: bedrockMantleBaseURL("openai/v1"),
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  "mantle-gpt-5": new AiChatAgent({
+    chatExecutor: new BedrockMantleResponsesExecutor({
+      modelId: "openai.gpt-5.6-luna",
+      baseURL: bedrockMantleBaseURL("openai/v1"),
+    }),
+    systemPromptTemplate: promptTemplate,
+    eventProducer: appEventProducer,
+  }),
+  "mantle-claude": new AiChatAgent({
+    chatExecutor: new BedrockMantleMessagesExecutor({
+      modelId: "anthropic.claude-haiku-4-5",
     }),
     systemPromptTemplate: promptTemplate,
     eventProducer: appEventProducer,

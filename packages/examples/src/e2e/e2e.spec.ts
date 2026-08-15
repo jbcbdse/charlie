@@ -31,17 +31,35 @@ async function chat(body: {
   agent?: string;
   messages?: ChatMessage[];
   user?: Record<string, string>;
-}): Promise<{ status: number; data: ChatResponse }> {
+}): Promise<{ status: number; data: ChatResponse & { error?: string } }> {
   const res = await fetch(`${BASE_URL}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   const data = (await res.json()) as ChatResponse & { error?: string };
-  if (res.status >= 500 && data.error) {
+  if (res.status >= 500 && data.error && !isModelUnavailable(data.error)) {
     throw new Error(`Server ${res.status}: ${data.error}`);
   }
   return { status: res.status, data };
+}
+
+function isModelUnavailable(error?: string): boolean {
+  return /not available for this account|permission_error|access_denied/i.test(
+    error ?? "",
+  );
+}
+
+function skipIfUnavailable(
+  agent: string,
+  status: number,
+  error?: string,
+): boolean {
+  if (status >= 500 && isModelUnavailable(error)) {
+    console.warn(`Skipping ${agent} e2e: ${error}`);
+    return true;
+  }
+  return false;
 }
 
 async function assertJudge(response: string, criteria: string): Promise<void> {
@@ -104,6 +122,52 @@ describe("Per-Module Response", () => {
       message: "What is 2 plus 2? Reply briefly with the number.",
       agent: "mantle-gpt-oss",
     });
+    await assertJudge(
+      data.response,
+      "The response indicates that the answer is 4",
+    );
+  });
+
+  test("charlie-bedrock-mantle Responses API via mantle-gpt-oss-responses", async () => {
+    const { data } = await chat({
+      message: "What is 2 plus 2? Reply briefly with the number.",
+      agent: "mantle-gpt-oss-responses",
+    });
+    await assertJudge(
+      data.response,
+      "The response indicates that the answer is 4",
+    );
+  });
+
+  test("charlie-bedrock-mantle Responses API via mantle-grok-responses", async () => {
+    const { data } = await chat({
+      message: "What is 2 plus 2? Reply briefly with the number.",
+      agent: "mantle-grok-responses",
+    });
+    await assertJudge(
+      data.response,
+      "The response indicates that the answer is 4",
+    );
+  });
+
+  test("charlie-bedrock-mantle Responses API via mantle-gpt-5", async () => {
+    const { status, data } = await chat({
+      message: "What is 2 plus 2? Reply briefly with the number.",
+      agent: "mantle-gpt-5",
+    });
+    if (skipIfUnavailable("mantle-gpt-5", status, data.error)) return;
+    await assertJudge(
+      data.response,
+      "The response indicates that the answer is 4",
+    );
+  }, 180_000);
+
+  test("charlie-bedrock-mantle Messages API via mantle-claude", async () => {
+    const { status, data } = await chat({
+      message: "What is 2 plus 2? Reply briefly with the number.",
+      agent: "mantle-claude",
+    });
+    if (skipIfUnavailable("mantle-claude", status, data.error)) return;
     await assertJudge(
       data.response,
       "The response indicates that the answer is 4",
@@ -263,6 +327,23 @@ describe("Tool Calling", () => {
       agent: "titan",
     });
     expect(status).toBe(200);
+    expect(data.response).toContain("105");
+  });
+
+  test("CalculatorTool via mantle-gpt-oss-responses", async () => {
+    const { data } = await chat({
+      message: "What is 15 multiplied by 7?",
+      agent: "mantle-gpt-oss-responses",
+    });
+    expect(data.response).toContain("105");
+  });
+
+  test("CalculatorTool via mantle-claude", async () => {
+    const { status, data } = await chat({
+      message: "What is 15 multiplied by 7?",
+      agent: "mantle-claude",
+    });
+    if (skipIfUnavailable("mantle-claude", status, data.error)) return;
     expect(data.response).toContain("105");
   });
 });

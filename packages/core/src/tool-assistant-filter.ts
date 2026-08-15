@@ -10,7 +10,9 @@ import { ChatMessage, ChatMessageTransformer } from "./types";
 export class ToolAssistantFilter implements ChatMessageTransformer {
   public transform(messages: ChatMessage[]): ChatMessage[] {
     if (messages.some((msg) => msg.role === "tool_call")) {
-      return messages.filter((msg) => msg.role === "tool_call");
+      return messages.filter(
+        (msg) => msg.role === "tool_call" || msg.role === "reasoning",
+      );
     }
     return messages;
   }

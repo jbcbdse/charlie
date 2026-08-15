@@ -12,8 +12,8 @@ Charlie is a TypeScript monorepo that provides a thin, stateless layer for calli
 packages/
   core/            — interfaces, AiChatAgent, BaseTool, event system   (@jbcbdse/charlie-core)
   bedrock/         — BedrockChatExecutor, Bedrock embedding generators  (@jbcbdse/charlie-bedrock)
-  bedrock-mantle/  — BedrockMantleExecutor (OpenAI-compatible Mantle)   (@jbcbdse/charlie-bedrock-mantle)
-  openai/          — OpenAiChatExecutor, GrokExecutor, OAI embeddings  (@jbcbdse/charlie-openai)
+  bedrock-mantle/  — Completions, Responses, and Messages executors    (@jbcbdse/charlie-bedrock-mantle)
+  openai/          — OpenAiChatExecutor, OpenAiResponsesExecutor, Grok (@jbcbdse/charlie-openai)
   ollama/          — OllamaExecutor (OpenAI-compatible Ollama)          (@jbcbdse/charlie-ollama)
   google/          — GeminiExecutor                                     (@jbcbdse/charlie-google)
   datadog/         — LlmSpansApi (subscribes to events, sends spans)   (@jbcbdse/charlie-datadog)
@@ -25,6 +25,7 @@ Dependency graph: everything depends on `core`. `datadog` depends only on `core`
 ## Key concepts
 
 **`ChatExecutor`** is the extension point. To add a new provider, implement this interface:
+
 - `modelProvider: string` — used by observability (e.g. `"openai"`, `"aws-bedrock"`)
 - `modelId: string` — the model being called
 - `execute(input): Promise<ChatAgentGetResponseOutput>` — make the API call, return `responseMessages` and `usage`
@@ -59,11 +60,13 @@ The `examples` package has two tsconfig files: `tsconfig.json` for the REPL/serv
 ## Testing
 
 Unit tests (only `core` has meaningful ones):
+
 ```bash
 npm run test --workspaces
 ```
 
 E2e tests (require live API keys in `.env`):
+
 ```bash
 cd packages/examples
 npx jest --config tsconfig.test.json
@@ -84,3 +87,10 @@ Copy `.env.example` to `.env` and fill in keys. AWS credentials must have Bedroc
 
 Some Bedrock models don't support the Converse API's tool-calling feature. Set `toolsSupported: false` on `BedrockChatExecutor` and add `InlineToolCallParser` to `preToolCallTransformers`. The parser reads JSON tool calls embedded in the model's plain-text response and converts them into the standard `MessageToolCall` format. The `titan` agent in examples exercises this path.
 
+## Bedrock Mantle APIs
+
+Mantle has three inference APIs; pick the executor that matches the model (see AWS model API compatibility):
+
+- `BedrockMantleExecutor` — Chat Completions (`/v1/chat/completions`). Default `openai.gpt-oss-20b`. Grok uses `bedrockMantleBaseURL("openai/v1")`.
+- `BedrockMantleResponsesExecutor` — Responses (`store: false`, encrypted reasoning round-tripped as `role: "reasoning"`). GPT-5.6 models use `/openai/v1`.
+- `BedrockMantleMessagesExecutor` — Anthropic Messages (`/anthropic/v1/messages`) via `@anthropic-ai/bedrock-sdk`. Claude thinking blocks are also `role: "reasoning"`.

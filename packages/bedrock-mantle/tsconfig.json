@@ -6,8 +6,7 @@
   },
   "include": ["./src/**/*.ts"],
   "references": [
-    {
-      "path": "../openai"
-    }
+    { "path": "../core" },
+    { "path": "../openai" }
   ]
 }

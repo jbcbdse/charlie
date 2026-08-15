@@ -45,6 +45,19 @@ export interface MessageAssistant {
   /** The name of the specific actor in this role, possibly not supported by all agents */
   name?: string;
 }
+/**
+ * Provider reasoning that must be round-tripped on the next request.
+ *
+ * OpenAI Responses (stateless `store: false`) uses `id` + `encryptedContent`.
+ * Anthropic Messages uses `content` + `signature` (thinking blocks).
+ */
+export interface MessageReasoning {
+  role: "reasoning";
+  id?: string;
+  encryptedContent?: string;
+  content?: string;
+  signature?: string;
+}
 export interface MessageToolCall {
   role: "tool_call";
   toolCalls: ToolCall[];
@@ -92,6 +105,7 @@ export type ChatMessage =
   | MessageSystem
   | MessageUser
   | MessageAssistant
+  | MessageReasoning
   | MessageToolCall
   | MessageTool;
 /**
