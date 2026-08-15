@@ -9,12 +9,14 @@ import {
   ChatAgentContext,
   MessageTool,
   MessageAssistant,
+  ChatRun,
 } from "./types";
 import { ToolExecutor } from "./tool-executor";
 import { EventName, eventProducer, EventProducer } from "./event-producer";
 import { newRunId } from "./new-run-id";
 import { ITool } from "./base-tool";
 import { TemplateSerializer } from "./template-serializer";
+import { createChatRun } from "./chat-run";
 
 export class AiChatAgent implements ChatAgent {
   private chatExecutor: ChatExecutor;
@@ -45,24 +47,36 @@ export class AiChatAgent implements ChatAgent {
     this.templateSerializer =
       options.templateSerializer || new TemplateSerializer();
   }
-  public async getResponse({
+  public getResponse({
     messages,
     tools,
     meta = {},
-  }: ChatAgentGetResponseInput): Promise<ChatAgentGetResponseOutput> {
+  }: ChatAgentGetResponseInput): ChatRun {
+    const runId = newRunId();
+    return createChatRun(this.eventProducer, runId, () =>
+      this.runLoop({ messages, tools, meta, runId }),
+    );
+  }
+
+  private async runLoop({
+    messages,
+    tools,
+    meta,
+    runId,
+  }: ChatAgentGetResponseInput & {
+    runId: string;
+  }): Promise<ChatAgentGetResponseOutput> {
     let doLoop = true;
     let responseMessages: ChatAgentGetResponseOutput["responseMessages"] = [];
     const context: ChatAgentContext = {
-      runId: newRunId(),
+      runId,
       modelId: this.chatExecutor.modelId,
       messages,
-      meta,
+      meta: meta ?? {},
       eventProducer: this.eventProducer,
       systemPromptTemplate: this.systemPromptTemplate,
       systemPrompt: undefined,
     };
-    context.runId = newRunId();
-    context.modelId = this.chatExecutor.modelId;
     context.messages = messages;
     let started = false;
     const chatStartMs = Date.now();

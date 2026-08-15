@@ -8,6 +8,11 @@ These types should be suitable for storing history with a clear idea of what hap
 
 import type { ITool } from "./base-tool";
 import type { EventProducer } from "./event-producer";
+import type {
+  EventName,
+  EventTypeMap,
+  EventChatStreamChunk,
+} from "./event-producer";
 
 /**
  * A system message in the chat
@@ -148,10 +153,19 @@ export interface ChatAgentGetResponseOutput {
     totalTokens: number;
   };
 }
+export type ChatRun = Promise<ChatAgentGetResponseOutput> & {
+  on<T extends EventName>(
+    eventName: T,
+    listener: (event: EventTypeMap[T], eventName: T) => void,
+  ): void;
+  off<T extends EventName>(
+    eventName: T,
+    listener: (event: EventTypeMap[T], eventName: T) => void,
+  ): void;
+  [Symbol.asyncIterator](): AsyncIterableIterator<EventChatStreamChunk>;
+};
 export interface ChatAgent {
-  getResponse(
-    input: ChatAgentGetResponseInput,
-  ): Promise<ChatAgentGetResponseOutput>;
+  getResponse(input: ChatAgentGetResponseInput): ChatRun;
 }
 export interface ChatExecutorInput {
   messages: ChatMessage[];

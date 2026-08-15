@@ -86,30 +86,36 @@ export class MessageConverter {
   }
 
   responseContentChatMessages(content: Content): ChatMessage[] {
-    return content.parts.map((part): ChatMessage => {
+    return content.parts.flatMap((part): ChatMessage[] => {
+      if ("thought" in part && part.thought) {
+        return [];
+      }
       if (part.text) {
-        return {
-          role: "assistant",
-          content: part.text,
-        };
+        return [
+          {
+            role: "assistant",
+            content: part.text,
+          },
+        ];
       }
       if (part.functionCall) {
-        return {
-          role: "tool_call",
-          toolCalls: [
-            {
-              id: "1",
-              type: "function",
-              function: {
-                name: part.functionCall.name,
-                // @ts-expect-error Google says `object` which should be assignable
-                arguments: part.functionCall.args,
+        return [
+          {
+            role: "tool_call",
+            toolCalls: [
+              {
+                id: "1",
+                type: "function",
+                function: {
+                  name: part.functionCall.name,
+                  // @ts-expect-error Google says `object` which should be assignable
+                  arguments: part.functionCall.args,
+                },
               },
-            },
-          ],
-        };
+            ],
+          },
+        ];
       }
-      // no other part responses are expected or supported
       throw new Error(`Unknown part type: ${JSON.stringify(part)}`);
     });
   }

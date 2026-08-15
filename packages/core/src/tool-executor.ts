@@ -1,5 +1,5 @@
 import { ITool } from "./base-tool";
-import { EventName } from "./event-producer";
+import { EventName, EventProducer, EventTypeMap } from "./event-producer";
 import { ChatAgentContext, MessageTool, MessageToolCall } from "./types";
 
 /**
@@ -34,8 +34,31 @@ export class ToolExecutor {
           toolCall: toolCallMessage,
           toolCallId: toolCall.id,
         });
+        const stampedProducer: EventProducer = {
+          emitter: context.eventProducer.emitter,
+          emit: (eventName, event) => {
+            if (
+              eventName === EventName.ToolProgress ||
+              eventName === EventName.Log
+            ) {
+              context.eventProducer.emit(eventName, {
+                ...event,
+                toolName: tool.name,
+                toolCallId: toolCall.id,
+              } as EventTypeMap[typeof eventName]);
+              return;
+            }
+            context.eventProducer.emit(eventName, event);
+          },
+        };
+        const toolContext = new Proxy(context, {
+          get(target, prop, receiver) {
+            if (prop === "eventProducer") return stampedProducer;
+            return Reflect.get(target, prop, receiver);
+          },
+        });
         const toolMessage = await tool
-          .handle(toolCall.function.arguments, context)
+          .handle(toolCall.function.arguments, toolContext)
           .then((toolResult) => ({
             role: "tool" as const,
             content: toolResult,

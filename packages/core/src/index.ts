@@ -18,10 +18,12 @@ export {
   MessageTool,
   MessageToolCall,
   MessageUser,
+  ChatRun,
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
 } from "./types";
+export { createChatRun } from "./chat-run";
 export { events, EventSubscriber } from "./event-subscriber";
 export {
   EventName,
@@ -31,8 +33,10 @@ export {
   EventChatEnd,
   EventChatStart,
   EventChatExecutorEnd,
+  EventChatStreamChunk,
   EventToolEnd,
   EventToolProgress,
   EventLog,
   LogLevel,
+  StreamChunk,
 } from "./event-producer";

@@ -76,6 +76,10 @@ export interface EventChatRawResponse extends ChatEndEvent {
 }
 export interface EventToolProgress extends ChatEvent {
   message: string;
+  /** Stamped by ToolExecutor during handle(). */
+  toolName?: string;
+  /** Stamped by ToolExecutor during handle(). */
+  toolCallId?: string;
 }
 export type LogLevel = "error" | "warn" | "info" | "debug" | "verbose";
 export interface EventLog extends ChatEvent {
@@ -83,6 +87,25 @@ export interface EventLog extends ChatEvent {
   level: LogLevel;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   meta: Record<string, any>;
+  toolName?: string;
+  toolCallId?: string;
+}
+
+export type StreamChunk =
+  | { type: "text"; text: string }
+  | { type: "thinking"; text: string }
+  | {
+      type: "tool_call";
+      index: number;
+      id?: string;
+      name?: string;
+      argumentsText?: string;
+    };
+
+export interface EventChatStreamChunk extends ChatEvent {
+  modelId: string;
+  modelProvider: string;
+  chunk: StreamChunk;
 }
 
 /**
@@ -113,6 +136,8 @@ export enum EventName {
   ToolProgress = "tool:progress",
   /** General-purpose structured log line emitted from anywhere with access to the context */
   Log = "log",
+  /** Append-only token slice from a streaming executor */
+  ChatStreamChunk = "chat:stream:chunk",
 }
 /**
  * Map of event names to event types
@@ -150,6 +175,7 @@ export interface EventTypeMap {
   [EventName.ChatRawResponse]: EventChatRawResponse;
   [EventName.ToolProgress]: EventToolProgress;
   [EventName.Log]: EventLog;
+  [EventName.ChatStreamChunk]: EventChatStreamChunk;
 }
 
 export class EventProducer {

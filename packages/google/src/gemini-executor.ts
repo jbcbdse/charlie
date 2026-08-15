@@ -47,27 +47,63 @@ export class GeminiExecutor implements ChatExecutor {
       modelId: this.modelId,
       request: req,
     });
-    const response = await this.model.generateContent(req);
+    const streamed = await this.model.generateContentStream(req);
+    for await (const chunk of streamed.stream) {
+      const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+      for (const part of parts) {
+        if ("thought" in part && part.thought && part.text) {
+          context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: { type: "thinking", text: part.text },
+          });
+          continue;
+        }
+        if (part.text) {
+          context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: { type: "text", text: part.text },
+          });
+        }
+        if (part.functionCall) {
+          context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: {
+              type: "tool_call",
+              index: 0,
+              name: part.functionCall.name,
+              argumentsText: JSON.stringify(part.functionCall.args ?? {}),
+            },
+          });
+        }
+      }
+    }
+    const aggregated = await streamed.response;
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       modelId: this.modelId,
-      response,
+      response: aggregated,
       timeMs: Date.now() - startMs,
     });
     const responseMessages = this.messageConverter.responseContentChatMessages(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      response.response.candidates![0].content,
+      aggregated.candidates![0].content,
     );
     return {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       responseMessage: responseMessages.at(-1)!,
       responseMessages,
-      usage: response.response.usageMetadata && {
+      usage: aggregated.usageMetadata && {
         inputTokens:
-          (response.response.usageMetadata.promptTokenCount || 0) +
-          (response.response.usageMetadata.cachedContentTokenCount || 0),
-        outputTokens: response.response.usageMetadata.candidatesTokenCount,
-        totalTokens: response.response.usageMetadata.totalTokenCount,
+          (aggregated.usageMetadata.promptTokenCount || 0) +
+          (aggregated.usageMetadata.cachedContentTokenCount || 0),
+        outputTokens: aggregated.usageMetadata.candidatesTokenCount,
+        totalTokens: aggregated.usageMetadata.totalTokenCount,
       },
     };
   }

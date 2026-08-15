@@ -70,57 +70,125 @@ export class OpenAiChatExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const data = await this.openAiClient.chat.completions.create(request);
+    const stream = await this.openAiClient.chat.completions.create({
+      ...request,
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+    let content = "";
+    const toolAcc = new Map<
+      number,
+      { id: string; name: string; arguments: string }
+    >();
+    let usage:
+      | {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+        }
+      | undefined;
+    const chunks: unknown[] = [];
+    for await (const part of stream) {
+      chunks.push(part);
+      if (part.usage) {
+        usage = part.usage;
+      }
+      const delta = part.choices[0]?.delta as
+        | {
+            content?: string | null;
+            reasoning_content?: string | null;
+            reasoning?: string | null;
+            tool_calls?: {
+              index?: number;
+              id?: string;
+              function?: { name?: string; arguments?: string };
+            }[];
+          }
+        | undefined;
+      if (!delta) continue;
+      if (delta.content) {
+        content += delta.content;
+        context.eventProducer.emit(EventName.ChatStreamChunk, {
+          context,
+          modelId: this.modelId,
+          modelProvider: this.modelProvider,
+          chunk: { type: "text", text: delta.content },
+        });
+      }
+      const thinking = delta.reasoning_content || delta.reasoning;
+      if (thinking) {
+        context.eventProducer.emit(EventName.ChatStreamChunk, {
+          context,
+          modelId: this.modelId,
+          modelProvider: this.modelProvider,
+          chunk: { type: "thinking", text: thinking },
+        });
+      }
+      for (const toolCall of delta.tool_calls ?? []) {
+        const index = toolCall.index ?? 0;
+        const acc = toolAcc.get(index) ?? { id: "", name: "", arguments: "" };
+        if (toolCall.id) acc.id = toolCall.id;
+        if (toolCall.function?.name) acc.name += toolCall.function.name;
+        if (toolCall.function?.arguments) {
+          acc.arguments += toolCall.function.arguments;
+        }
+        toolAcc.set(index, acc);
+        context.eventProducer.emit(EventName.ChatStreamChunk, {
+          context,
+          modelId: this.modelId,
+          modelProvider: this.modelProvider,
+          chunk: {
+            type: "tool_call",
+            index,
+            id: toolCall.id,
+            name: toolCall.function?.name,
+            argumentsText: toolCall.function?.arguments,
+          },
+        });
+      }
+    }
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: data,
+      response: chunks[chunks.length - 1],
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    const responseMessage = data.choices[0].message;
-    const msg = this.responseToChatMessage(responseMessage);
+    const msg = this.accumulatedToChatMessage(content, toolAcc);
     return {
       responseMessage: msg,
       responseMessages: [msg],
-      usage: data.usage && {
-        inputTokens: data.usage.prompt_tokens,
-        outputTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens,
+      usage: usage && {
+        inputTokens: usage.prompt_tokens,
+        outputTokens: usage.completion_tokens,
+        totalTokens: usage.total_tokens,
       },
     };
   }
 
-  /**
-   * When OpenAI responds, it does not include a text message with tool calls, only one or the other
-   * and it should always be an "assistant" message
-   */
-  private responseToChatMessage(
-    message: OpenAI.Chat.Completions.ChatCompletionMessage,
+  private accumulatedToChatMessage(
+    content: string,
+    toolAcc: Map<number, { id: string; name: string; arguments: string }>,
   ): ChatMessage {
-    if (message.role !== "assistant") {
-      throw new Error(`Unexpected response message role: ${message.role}`);
-    }
-    if (message?.tool_calls && message.tool_calls?.length > 0) {
+    if (toolAcc.size > 0) {
       return {
         role: "tool_call",
-        toolCalls: message.tool_calls
-          .filter((toolCall) => toolCall.type === "function")
-          .map((toolCall) => ({
+        toolCalls: [...toolAcc.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([, toolCall]) => ({
             function: {
-              name: toolCall.function.name,
-              arguments: JSON.parse(toolCall.function.arguments),
+              name: toolCall.name,
+              arguments: parseArguments(toolCall.arguments),
             },
-            type: "function",
+            type: "function" as const,
             id: toolCall.id,
           })),
       };
-    } else {
-      return {
-        role: "assistant",
-        content: message.content || "",
-        name: undefined,
-      };
     }
+    return {
+      role: "assistant",
+      content,
+      name: undefined,
+    };
   }
 
   private toOpenAiMessages(messages: ChatMessage[]): OpenAiChatMessage[] {
@@ -172,5 +240,16 @@ export class OpenAiChatExecutor implements ChatExecutor {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         throw new Error(`Unknown message role: ${(msg as any)?.role}`);
       });
+  }
+}
+
+function parseArguments(raw: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(raw || "{}");
+    return parsed !== null && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
   }
 }
