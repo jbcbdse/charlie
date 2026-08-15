@@ -79,14 +79,104 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const data = await this.client.messages.create(request);
+    const stream = await this.client.messages.create({
+      ...request,
+      stream: true,
+    });
+    const blocks: {
+      type: string;
+      thinking?: string;
+      signature?: string;
+      text?: string;
+      id?: string;
+      name?: string;
+      input?: unknown;
+      data?: string;
+      inputJson?: string;
+    }[] = [];
+    let inputTokens = 0;
+    let outputTokens = 0;
+    for await (const event of stream) {
+      if (event.type === "message_start") {
+        inputTokens = event.message.usage?.input_tokens ?? inputTokens;
+      }
+      if (event.type === "content_block_start") {
+        const block = event.content_block;
+        blocks[event.index] = { ...block };
+        if (block.type === "tool_use") {
+          context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: {
+              type: "tool_call",
+              index: event.index,
+              id: block.id,
+              name: block.name,
+            },
+          });
+        }
+      }
+      if (event.type === "content_block_delta") {
+        const acc = blocks[event.index] ?? { type: "text" };
+        const delta = event.delta;
+        if (delta.type === "text_delta" && delta.text) {
+          acc.text = (acc.text ?? "") + delta.text;
+          context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: { type: "text", text: delta.text },
+          });
+        }
+        if (delta.type === "thinking_delta" && delta.thinking) {
+          acc.thinking = (acc.thinking ?? "") + delta.thinking;
+          context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: { type: "thinking", text: delta.thinking },
+          });
+        }
+        if (delta.type === "signature_delta" && delta.signature) {
+          acc.signature = delta.signature;
+        }
+        if (delta.type === "input_json_delta" && delta.partial_json) {
+          acc.inputJson = (acc.inputJson ?? "") + delta.partial_json;
+          context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: {
+              type: "tool_call",
+              index: event.index,
+              argumentsText: delta.partial_json,
+            },
+          });
+        }
+        blocks[event.index] = acc;
+      }
+      if (event.type === "message_delta") {
+        outputTokens = event.usage?.output_tokens ?? outputTokens;
+      }
+    }
+    const content = blocks.filter(Boolean).map((block) => {
+      if (block.inputJson) {
+        try {
+          block.input = JSON.parse(block.inputJson);
+        } catch {
+          block.input = {};
+        }
+      }
+      return block;
+    });
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: data,
+      response: { content, usage: { inputTokens, outputTokens } },
       modelId: this.modelId,
       timeMs: Date.now() - startMs,
     });
-    const responseMessages = this.messageConverter.fromResponse(data.content);
+    const responseMessages = this.messageConverter.fromResponse(content);
     const responseMessage = [...responseMessages]
       .reverse()
       .find((m) => m.role !== "reasoning") ??
@@ -100,10 +190,10 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
         responseMessages.length > 0
           ? responseMessages
           : [{ role: "assistant", content: "" }],
-      usage: data.usage && {
-        inputTokens: data.usage.input_tokens,
-        outputTokens: data.usage.output_tokens,
-        totalTokens: data.usage.input_tokens + data.usage.output_tokens,
+      usage: {
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
       },
     };
   }

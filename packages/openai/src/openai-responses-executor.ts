@@ -5,6 +5,7 @@ import {
   ChatMessage,
   ChatExecutorInput,
   EventName,
+  StreamChunk,
 } from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutorOptions } from "./openai-chat-executor";
 
@@ -39,12 +40,13 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
     tools,
     context,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
-    const request: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
+    const request: OpenAI.Responses.ResponseCreateParamsStreaming = {
       model: this.options.modelId,
       input: this.toInputItems(messages),
       instructions: context.systemPrompt,
       store: false,
       include: ["reasoning.encrypted_content"],
+      stream: true,
       tools:
         tools &&
         tools.map((tool) => ({
@@ -62,33 +64,82 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const data = await this.openAiClient.responses.create(request);
+    const stream = await this.openAiClient.responses.create(request);
+    let completed: OpenAI.Responses.Response | undefined;
+    for await (const event of stream) {
+      if (event.type === "response.output_text.delta" && event.delta) {
+        this.emitChunk(context, { type: "text", text: event.delta });
+      }
+      if (
+        (event.type === "response.reasoning_text.delta" ||
+          event.type === "response.reasoning_summary_text.delta") &&
+        event.delta
+      ) {
+        this.emitChunk(context, { type: "thinking", text: event.delta });
+      }
+      if (
+        event.type === "response.output_item.added" &&
+        event.item.type === "function_call"
+      ) {
+        this.emitChunk(context, {
+          type: "tool_call",
+          index: event.output_index,
+          id: event.item.call_id,
+          name: event.item.name,
+        });
+      }
+      if (
+        event.type === "response.function_call_arguments.delta" &&
+        event.delta
+      ) {
+        this.emitChunk(context, {
+          type: "tool_call",
+          index: event.output_index,
+          argumentsText: event.delta,
+        });
+      }
+      if (event.type === "response.completed") {
+        completed = event.response;
+      }
+    }
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: data,
+      response: completed,
       modelId: this.modelId,
       timeMs: Date.now() - startMs,
     });
-    const responseMessages = this.outputToChatMessages(data.output);
+    const responseMessages = this.outputToChatMessages(completed?.output ?? []);
     const responseMessage = [...responseMessages]
       .reverse()
       .find((m) => m.role !== "reasoning") ??
       responseMessages[responseMessages.length - 1] ?? {
         role: "assistant" as const,
-        content: data.output_text || "",
+        content: completed?.output_text || "",
       };
     return {
       responseMessage,
       responseMessages:
         responseMessages.length > 0
           ? responseMessages
-          : [{ role: "assistant", content: data.output_text || "" }],
-      usage: data.usage && {
-        inputTokens: data.usage.input_tokens,
-        outputTokens: data.usage.output_tokens,
-        totalTokens: data.usage.total_tokens,
+          : [{ role: "assistant", content: completed?.output_text || "" }],
+      usage: completed?.usage && {
+        inputTokens: completed.usage.input_tokens,
+        outputTokens: completed.usage.output_tokens,
+        totalTokens: completed.usage.total_tokens,
       },
     };
+  }
+
+  private emitChunk(
+    context: ChatExecutorInput["context"],
+    chunk: StreamChunk,
+  ): void {
+    context.eventProducer.emit(EventName.ChatStreamChunk, {
+      context,
+      modelId: this.modelId,
+      modelProvider: this.modelProvider,
+      chunk,
+    });
   }
 
   private toInputItems(messages: ChatMessage[]): ResponseInputItem[] {
@@ -186,7 +237,7 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
           type: "function",
           function: {
             name: item.name,
-            arguments: parseArguments(item.arguments),
+            arguments: this.parseArguments(item.arguments),
           },
         });
         continue;
@@ -195,15 +246,15 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
     flushToolCalls();
     return messages;
   }
-}
 
-function parseArguments(raw: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed !== null && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
+  private parseArguments(raw: string): Record<string, unknown> {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return parsed !== null && typeof parsed === "object"
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
   }
 }

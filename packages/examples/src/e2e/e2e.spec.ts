@@ -476,6 +476,10 @@ describe("Streaming SSE", () => {
     ["mantle-deepseek", "mantle"],
     ["mantle-glm", "mantle"],
     ["mantle-grok", "mantle"],
+    ["mantle-gpt-oss-responses", "mantle"],
+    ["mantle-grok-responses", "mantle"],
+    ["mantle-gpt-5", "mantle"],
+    ["mantle-claude", "mantle"],
     ["ollama", "ollama"],
   ];
 
