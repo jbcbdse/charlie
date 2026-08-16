@@ -30,6 +30,7 @@ import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
 import { DeleteAccountTool } from "../tools/delete-account.tool";
 import { AvailableAgent, agentsHandler } from "./routes/agents";
 import { chatHandler } from "./routes/chat";
+import { loadOptionalMcp } from "../load-mcp";
 dotenv.config({ path: "../../.env" });
 
 const appEventProducer = new EventProducer();
@@ -205,7 +206,7 @@ const agents: Record<AvailableAgent, ChatAgent> = {
   }),
 };
 
-const tools = [
+const localTools = [
   new CountLettersTool(),
   new CurrentTimeTool(),
   new CalculatorTool(),
@@ -218,11 +219,26 @@ const availableAgents = Object.keys(agents) as AvailableAgent[];
 const app = express();
 app.use(express.json());
 
-app.get("/agents", agentsHandler(availableAgents));
-app.post("/chat", chatHandler(agents, availableAgents, tools, appEvents));
+async function start() {
+  const mcp = await loadOptionalMcp();
+  const tools = [...localTools, ...mcp.tools];
+  app.get("/agents", agentsHandler(availableAgents));
+  app.post("/chat", chatHandler(agents, availableAgents, tools, appEvents));
+  const shutdown = async () => {
+    await mcp.close();
+    process.exit(0);
+  };
+  process.once("SIGINT", () => {
+    void shutdown();
+  });
+  process.once("SIGTERM", () => {
+    void shutdown();
+  });
+  const PORT = process.env.PORT || 3456;
+  app.listen(PORT, () => {
+    console.log(`Charlie HTTP server running on http://localhost:${PORT}`);
+    console.log(`Available agents: ${availableAgents.join(", ")}`);
+  });
+}
 
-const PORT = process.env.PORT || 3456;
-app.listen(PORT, () => {
-  console.log(`Charlie HTTP server running on http://localhost:${PORT}`);
-  console.log(`Available agents: ${availableAgents.join(", ")}`);
-});
+void start();

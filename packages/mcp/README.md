@@ -1,0 +1,33 @@
+# @jbcbdse/charlie-mcp
+
+MCP client adapter for Charlie. Tools become `ITool`s for `getResponse`. Resources and prompts stay caller APIs.
+
+```ts
+import { McpSessions } from "@jbcbdse/charlie-mcp";
+
+const mcp = await McpSessions.connect([
+  {
+    name: "everything",
+    transport: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-everything"],
+    },
+  },
+]);
+
+await agent.getResponse({
+  messages: history,
+  tools: mcp.tools(),
+});
+
+const { resources } = await mcp.listResources("everything");
+const { contents } = await mcp.readResource("everything", resources[0].uri);
+
+const starter = await mcp.getPrompt("everything", "args-prompt", {
+  city: "Austin",
+  state: "TX",
+});
+
+await mcp.close();
+```

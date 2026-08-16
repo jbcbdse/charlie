@@ -17,10 +17,11 @@ packages/
   ollama/          — OllamaExecutor (OpenAI-compatible Ollama)          (@jbcbdse/charlie-ollama)
   google/          — GeminiExecutor                                     (@jbcbdse/charlie-google)
   datadog/         — LlmSpansApi (subscribes to events, sends spans)   (@jbcbdse/charlie-datadog)
+  mcp/             — MCP client: tools as ITool, resource/prompt APIs  (@jbcbdse/charlie-mcp)
   examples/        — REPL, HTTP server, e2e tests (not published)
 ```
 
-Dependency graph: everything depends on `core`. `datadog` depends only on `core`. `examples` depends on all packages. Build order matters: build `core` before anything else.
+Dependency graph: everything depends on `core`. `datadog` and `mcp` depend only on `core`. `examples` depends on all packages. Build order matters: build `core` before anything else.
 
 ## Key concepts
 
@@ -65,6 +66,8 @@ const result = await run;
 Executors always use the provider stream API and map vendor parts into a common `CharlieStreamPart` stream (`text`, `thinking`, `tool_call`, `reasoning`, `usage`, `error`). `CharlieStreamConsumer` in core emits `chat:stream:chunk` and folds parts into `responseMessages`. Thinking tokens are never concatenated into `MessageAssistant.content`. Yield `reasoning` when the provider needs a round-trip (OpenAI Responses encrypted reasoning, Anthropic thinking signatures). Completions-style `reasoning_content` stays `thinking` (stream-only). On `tool_call` parts, `id` and `name` are last-wins; `argumentsText` is append-only.
 
 **Tools** extend `BaseTool` with a Zod schema and an async `handler`. Setting `returnDirect = true` on a tool causes the agent to stop the loop and return the tool result directly without re-entering the LLM — useful for side-effect tools like account deletion.
+
+**MCP** (`@jbcbdse/charlie-mcp`) is a client adapter, not an executor. `McpSessions.connect` talks to stdio or Streamable HTTP servers. MCP tools become `ITool[]` for `getResponse`. Resources (`listResources` / `readResource`) and prompts (`listPrompts` / `getPrompt` → `ChatMessage[]`) are caller APIs — `AiChatAgent` never sees them. The REPL/server load servers from `MCP_CONFIG` if set.
 
 **Events** use a singleton `eventProducer` (from `core`). Executors call `this.eventProducer.emit(EventName.X, ...)`. Consumers subscribe via `events.on(EventName.X, handler)`, the typed `EventSubscriber` class, or `ChatRun.on` (run-scoped). The `datadog` package is implemented entirely as an event subscriber — it never touches the executor. Stream chunks use the same bus; a global subscriber must still filter by `requestId` / `runId`.
 
