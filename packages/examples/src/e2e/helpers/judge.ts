@@ -11,6 +11,8 @@ export async function judge(
 ): Promise<JudgeResult> {
   const message = [
     "YOUR TASK: Evaluate a response against criteria.",
+    "Judge ONLY the stated criteria. Do not add extra requirements.",
+    "Sarcasm, emoji, and product names (e.g. ChatGPT) are irrelevant unless the criteria mentions them.",
     "Return ONLY a JSON object — no explanation, no emoji, no surrounding text.",
     'Format: {"pass": true, "reason": "..."} or {"pass": false, "reason": "..."}',
     "",

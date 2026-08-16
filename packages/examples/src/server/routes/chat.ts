@@ -38,11 +38,11 @@ function toJsonBody(
   const assistantMessages = result.responseMessages.filter(
     (m) => m.role === "assistant",
   );
-  const persistable = result.responseMessages.filter(
-    (m) => m.role === "assistant" || m.role === "reasoning",
-  );
   const responseText = assistantMessages.map((m) => m.content).join("\n");
-  const updatedMessages: ChatMessage[] = [...history, ...persistable];
+  const updatedMessages: ChatMessage[] = [
+    ...history,
+    ...result.responseMessages,
+  ];
   return {
     response: responseText,
     agent,

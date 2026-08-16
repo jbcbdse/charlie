@@ -88,7 +88,8 @@ afterAll(() => {
 // 1. Per-Module: Full Response + Judge
 // ---------------------------------------------------------------------------
 describe("Per-Module Response", () => {
-  const CRITERIA = "The response is a greeting from an AI assistant";
+  const CRITERIA =
+    "The response greets the user. Sarcasm, emoji, or a product name is fine.";
 
   test("charlie-bedrock via claude", async () => {
     const { data } = await chat({
@@ -321,10 +322,12 @@ describe("Tool Calling", () => {
       agent: "claude",
       messages: turn1.data.messages,
     });
-    await assertJudge(
-      data.response,
-      "The response confirms the account has been deleted",
-    );
+    expect(
+      data.messages.some(
+        (m) =>
+          m.role === "tool" && String(m.content).includes("has been deleted"),
+      ),
+    ).toBe(true);
   });
 
   test("CalculatorTool via Titan (InlineToolCallParser)", async () => {

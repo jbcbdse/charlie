@@ -289,11 +289,7 @@ async function handleChat(input: string): Promise<string> {
     });
     const response = await run;
     process.stdout.write("\n");
-    messageHistory.push(
-      ...response.responseMessages.filter(
-        (msg) => msg.role === "assistant" || msg.role === "reasoning",
-      ),
-    );
+    messageHistory.push(...response.responseMessages);
     return "";
   } catch (err) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
