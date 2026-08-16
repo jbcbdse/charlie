@@ -9,6 +9,7 @@ import {
   EventSubscriber,
   MessageUser,
   ToolAssistantFilter,
+  type ITool,
 } from "@jbcbdse/charlie-core";
 import {
   BedrockChatExecutor,
@@ -32,6 +33,7 @@ import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
 import dotenv from "dotenv";
 import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
 import { DeleteAccountTool } from "../tools/delete-account.tool";
+import { loadOptionalMcp } from "../load-mcp";
 dotenv.config({ path: "../../.env" });
 
 const appEventProducer = new EventProducer();
@@ -247,13 +249,14 @@ const agents: Record<AvailableAgent, ChatAgent> = {
     eventProducer: appEventProducer,
   }),
 };
-const tools = [
+const localTools = [
   new CountLettersTool(),
   new CurrentTimeTool(),
   new CalculatorTool(),
   new DirectBirthdayTool(),
   new DeleteAccountTool(),
 ];
+let tools: ITool[] = localTools;
 const messageHistory: ChatMessage[] = [];
 const availableAgents: AvailableAgent[] = Object.keys(
   agents,
@@ -335,6 +338,8 @@ async function handleCmd(cmd: string): Promise<string | null> {
 }
 
 async function startRepl() {
+  const mcp = await loadOptionalMcp();
+  tools = [...localTools, ...mcp.tools];
   await sleep(1);
   console.log("Welcome to the chatbot REPL");
   console.log(`Using agent ${currentAgent}`);
@@ -351,6 +356,12 @@ async function startRepl() {
     },
     ignoreUndefined: true,
   });
+  r.on("exit", () => {
+    void mcp.close();
+  });
 }
 
-startRepl();
+startRepl().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

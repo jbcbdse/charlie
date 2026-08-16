@@ -1,0 +1,35 @@
+{
+  "name": "@jbcbdse/charlie-mcp",
+  "version": "0.4.0",
+  "description": "MCP client adapter for Charlie: tools as ITool, plus caller APIs for resources and prompts",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbcbdse/charlie.git"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc -p ./tsconfig.json",
+    "lint": "eslint --config ../../eslint.config.mjs .",
+    "test": "jest"
+  },
+  "author": "Jonathan Barnett",
+  "license": "MIT",
+  "dependencies": {
+    "@jbcbdse/charlie-core": "^0.4.0",
+    "@modelcontextprotocol/client": "^2.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/server": "^2.0.0",
+    "@modelcontextprotocol/server-everything": "^2026.7.4"
+  }
+}
