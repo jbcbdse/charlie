@@ -67,6 +67,8 @@ Executors always use the provider stream API and map vendor parts into a common 
 
 **Tools** extend `BaseTool` with a Zod schema and an async `handler`. Setting `returnDirect = true` on a tool causes the agent to stop the loop and return the tool result directly without re-entering the LLM — useful for side-effect tools like account deletion.
 
+**preRunTransformers** run once before the first executor call. They return the messages to send and may replace `context.tools` (a mutable copy of the `getResponse` tools). Use this to filter a large tool list or rewrite incoming messages without wrapping every `getResponse` call. `preToolCallTransformers` / `postToolCallTransformers` / `postRunTransformers` still process LLM output around tool execution.
+
 **MCP** (`@jbcbdse/charlie-mcp`) is a client adapter, not an executor. `McpSessions.connect` talks to stdio or Streamable HTTP servers. MCP tools become `ITool[]` for `getResponse`. Resources (`listResources` / `readResource`) and prompts (`listPrompts` / `getPrompt` → `ChatMessage[]`) are caller APIs — `AiChatAgent` never sees them. The REPL/server load servers from `MCP_CONFIG` if set.
 
 **Events** use a singleton `eventProducer` (from `core`). Executors call `this.eventProducer.emit(EventName.X, ...)`. Consumers subscribe via `events.on(EventName.X, handler)`, the typed `EventSubscriber` class, or `ChatRun.on` (run-scoped). The `datadog` package is implemented entirely as an event subscriber — it never touches the executor. Stream chunks use the same bus; a global subscriber must still filter by `requestId` / `runId`.

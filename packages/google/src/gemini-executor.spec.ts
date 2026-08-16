@@ -33,6 +33,7 @@ describe("GeminiExecutor streaming", () => {
         runId: "run-1",
         modelId: "gemini-test",
         messages: [],
+        tools: [],
         meta: {},
         eventProducer: producer,
       },

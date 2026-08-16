@@ -92,6 +92,7 @@ interface RunData {
   traceId: string;
   parentSpanId?: string;
   context: ChatAgentContext;
+  inputMessages: ChatMessage[];
   runSpanId: string;
   spans: Span[];
   timer: NodeJS.Timeout;
@@ -141,6 +142,7 @@ export class LlmSpansApi {
       parentSpanId,
       runSpanId: uuid(),
       context: event.context,
+      inputMessages: event.messages,
       spans: [],
       timer,
     };
@@ -161,7 +163,7 @@ export class LlmSpansApi {
       duration: event.timeMs * 1e6,
       meta: {
         kind: "agent",
-        input: { messages: event.context.messages.map(this.toMessage).flat() },
+        input: { messages: runData.inputMessages.map(this.toMessage).flat() },
         output: { messages: event.messages.map(this.toMessage).flat() },
         metadata: {
           model_name: event.context.modelId,

@@ -34,6 +34,7 @@ function context(): ChatExecutorInput["context"] {
     runId: "run",
     modelId: "gpt-5.4",
     messages: [],
+    tools: [],
     meta: {},
     eventProducer: { emit: jest.fn() },
   } as unknown as ChatExecutorInput["context"];

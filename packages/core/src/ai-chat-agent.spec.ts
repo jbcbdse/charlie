@@ -148,6 +148,140 @@ describe("AiChatAgent", () => {
       expect(responseMessage.content).toBe("pong");
       expect(response.responseMessages).toMatchSnapshot();
     });
+    it("lets a preRun transformer filter tools and mutate messages before execute", async () => {
+      const keep = new PingPongTool();
+      const drop = new CalculatorTool();
+      const inputMessages: ChatMessage[] = [
+        { role: "system", content: "ignore me" },
+        { role: "user", content: "hey" },
+      ];
+      const inputTools = [keep, drop];
+      const capturing = chatExecutor as MockExecutor;
+      const started: ChatMessage[][] = [];
+      const producer = new EventProducer();
+      producer.emitter.on(EventName.ChatStart, (event) => {
+        started.push(event.messages);
+      });
+      const localAgent = new AiChatAgent({
+        chatExecutor: capturing,
+        eventProducer: producer,
+        preRunTransformers: [
+          {
+            async transform(messages, context) {
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              context.tools = context.tools.filter(
+                (tool) => tool.name === keep.name,
+              );
+              return messages.filter((message) => message.role === "user");
+            },
+          },
+        ],
+      });
+      await localAgent.getResponse({
+        messages: inputMessages,
+        tools: inputTools,
+      });
+      expect(capturing.execute.mock.calls[0][0].tools).toEqual([keep]);
+      expect(capturing.execute.mock.calls[0][0].messages).toEqual([
+        { role: "user", content: "hey" },
+      ]);
+      expect(started).toEqual([[{ role: "user", content: "hey" }]]);
+      expect(inputTools).toEqual([keep, drop]);
+      expect(inputMessages).toEqual([
+        { role: "system", content: "ignore me" },
+        { role: "user", content: "hey" },
+      ]);
+    });
+    it("passes undefined tools to execute when the caller omits them", async () => {
+      const capturing = chatExecutor as MockExecutor;
+      await agent.getResponse({
+        messages: [{ role: "user", content: "hey" }],
+      });
+      expect(capturing.execute.mock.calls[0][0].tools).toBeUndefined();
+    });
+    it("runs preRun transformers once even when the tool loop continues", async () => {
+      let preRunCalls = 0;
+      const localAgent = new AiChatAgent({
+        chatExecutor,
+        preRunTransformers: [
+          {
+            transform(messages) {
+              preRunCalls += 1;
+              return messages;
+            },
+          },
+        ],
+      });
+      await localAgent.getResponse({
+        messages: [{ role: "user", content: "Calculate 3 + 4" }],
+        tools: [new CalculatorTool()],
+      });
+      expect(preRunCalls).toBe(1);
+      expect((chatExecutor as MockExecutor).execute.mock.calls.length).toBe(2);
+    });
+    it("uses context.tools mutated by a postToolCall transformer on the next executor call", async () => {
+      const seen: Array<string[] | undefined> = [];
+      const inputTools = [new CalculatorTool()];
+      const inputMessages: ChatMessage[] = [
+        { role: "user", content: "Calculate 3 + 4" },
+      ];
+      const executor: ChatExecutor = {
+        modelId: "mock-model-id",
+        modelProvider: "mock-model-provider",
+        execute: jest.fn(async (input: ChatExecutorInput) => {
+          seen.push(input.tools?.map((tool) => tool.name));
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "user") {
+            const responseMessage: ChatMessage = {
+              role: "tool_call",
+              toolCalls: [
+                {
+                  id: "toolcall1",
+                  type: "function",
+                  function: {
+                    name: "CalculatorTool",
+                    arguments: { expr: "3 + 4" },
+                  },
+                },
+              ],
+            };
+            return {
+              responseMessage,
+              responseMessages: [responseMessage],
+            };
+          }
+          const responseMessage: ChatMessage = {
+            role: "assistant",
+            content: "done",
+          };
+          return { responseMessage, responseMessages: [responseMessage] };
+        }),
+      };
+      const localAgent = new AiChatAgent({
+        chatExecutor: executor,
+        postToolCallTransformers: [
+          {
+            transform(messages, context) {
+              context.tools = [];
+              return messages;
+            },
+          },
+        ],
+      });
+      const response = await localAgent.getResponse({
+        messages: inputMessages,
+        tools: inputTools,
+      });
+      expect(seen).toEqual([["CalculatorTool"], undefined]);
+      expect(response.responseMessage).toEqual({
+        role: "assistant",
+        content: "done",
+      });
+      expect(inputTools).toHaveLength(1);
+      expect(inputMessages).toEqual([
+        { role: "user", content: "Calculate 3 + 4" },
+      ]);
+    });
   });
 
   describe("eventProducer injection", () => {

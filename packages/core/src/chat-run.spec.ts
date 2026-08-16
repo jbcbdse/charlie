@@ -13,6 +13,7 @@ function emitText(producer: EventProducer, runId: string, text: string): void {
       runId,
       modelId: "m",
       messages: [],
+      tools: [],
       meta: {},
       eventProducer: producer,
     },

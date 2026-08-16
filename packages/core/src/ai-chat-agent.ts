@@ -21,6 +21,7 @@ import { ChatRunGenerator } from "./chat-run";
 export class AiChatAgent implements ChatAgent {
   private chatExecutor: ChatExecutor;
   private toolExecutor: ToolExecutor;
+  private preRunTransformers: ChatMessageTransformer[] = [];
   private preToolCallTransformers: ChatMessageTransformer[] = [];
   private postToolCallTransformers: ChatMessageTransformer[] = [];
   private postRunTransformers: ChatMessageTransformer[] = [];
@@ -32,6 +33,7 @@ export class AiChatAgent implements ChatAgent {
     toolExecutor?: ToolExecutor;
     systemPromptTemplate?: string;
     templateSerializer?: TemplateSerializer;
+    preRunTransformers?: ChatMessageTransformer[];
     preToolCallTransformers?: ChatMessageTransformer[];
     postToolCallTransformers?: ChatMessageTransformer[];
     postRunTransformers?: ChatMessageTransformer[];
@@ -39,6 +41,7 @@ export class AiChatAgent implements ChatAgent {
   }) {
     this.chatExecutor = options.chatExecutor;
     this.toolExecutor = options.toolExecutor || new ToolExecutor();
+    this.preRunTransformers = options.preRunTransformers || [];
     this.preToolCallTransformers = options.preToolCallTransformers || [];
     this.postToolCallTransformers = options.postToolCallTransformers || [];
     this.postRunTransformers = options.postRunTransformers || [];
@@ -71,15 +74,18 @@ export class AiChatAgent implements ChatAgent {
     const context: ChatAgentContext = {
       runId,
       modelId: this.chatExecutor.modelId,
-      messages,
+      messages: [...messages],
+      tools: [...(tools ?? [])],
       meta: meta ?? {},
       eventProducer: this.eventProducer,
       systemPromptTemplate: this.systemPromptTemplate,
       systemPrompt: undefined,
     };
-    context.messages = messages;
-    let started = false;
     const chatStartMs = Date.now();
+    for (const transformer of this.preRunTransformers) {
+      context.messages = await transformer.transform(context.messages, context);
+    }
+    let started = false;
     let lastLlmResponseMessages: ChatMessage[] = [];
     do {
       // Synthesize the system prompt from the template and meta on each iteration
@@ -93,7 +99,7 @@ export class AiChatAgent implements ChatAgent {
         this.eventProducer.emit(EventName.ChatStart, {
           context,
           startTime: chatStartMs,
-          messages,
+          messages: context.messages,
           systemPrompt: context.systemPrompt,
           modelId: this.chatExecutor.modelId,
         });
@@ -103,13 +109,13 @@ export class AiChatAgent implements ChatAgent {
       this.eventProducer.emit(EventName.ChatExecutorStart, {
         context,
         startTime: chatExecutorStartMs,
-        messages,
+        messages: context.messages,
         systemPrompt: context.systemPrompt,
         modelId: this.chatExecutor.modelId,
       });
       const response = await this.chatExecutor.execute({
-        messages,
-        tools,
+        messages: context.messages,
+        tools: context.tools.length ? context.tools : undefined,
         context,
       });
       let newResponseMessages = response.responseMessages;
@@ -137,7 +143,7 @@ export class AiChatAgent implements ChatAgent {
       if (tools && toolCalls.length > 0) {
         const toolResponses = await this.executeToolCalls(
           toolCalls,
-          tools,
+          context.tools,
           context,
         );
         responseMessages.push(...toolResponses);
@@ -154,7 +160,7 @@ export class AiChatAgent implements ChatAgent {
           responseMessages.push(directMessage);
           doLoop = false;
         }
-        messages = [...messages, ...newMessages];
+        context.messages = [...context.messages, ...newMessages];
       } else {
         doLoop = false;
       }

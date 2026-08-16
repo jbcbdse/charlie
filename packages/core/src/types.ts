@@ -94,7 +94,9 @@ export interface MessageTool {
 /**
  * A transformer that can be used to modify an array of chat messages, a subset of the chat history
  *
- * This is useful as a process messages before or after tool calls
+ * This is useful as a process messages before or after tool calls.
+ * `preRunTransformers` also run here: return the messages to send, and mutate
+ * `context.tools` to filter or replace the tool list for the run.
  */
 export interface ChatMessageTransformer {
   transform(
@@ -123,6 +125,12 @@ export interface ChatAgentContext {
   runId: string;
   modelId: string;
   messages: ChatMessage[];
+  /**
+   * Tools available for this run. The agent always sets this to an array
+   * (copy of `getResponse` tools). `preRunTransformers` may replace or
+   * filter it; later loop iterations use the mutated list.
+   */
+  tools: ITool[];
   meta: ChatAgentContentMeta;
   eventProducer: EventProducer;
   /** Set by ToolExecutor for the duration of handle(). */

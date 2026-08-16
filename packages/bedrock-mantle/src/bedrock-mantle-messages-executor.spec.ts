@@ -6,6 +6,7 @@ function context(emit = jest.fn()) {
     runId: "run",
     modelId: "anthropic.claude-haiku-4-5",
     messages: [],
+    tools: [],
     meta: {},
     eventProducer: { emit },
   };
