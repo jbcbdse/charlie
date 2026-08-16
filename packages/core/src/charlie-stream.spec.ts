@@ -7,6 +7,7 @@ function context(producer: EventProducer): ChatAgentContext {
     runId: "run-1",
     modelId: "test-model",
     messages: [],
+    tools: [],
     meta: {},
     eventProducer: producer,
   };

@@ -16,6 +16,7 @@ function context(producer: EventProducer) {
     runId: "run-1",
     modelId: "test-model",
     messages: [],
+    tools: [],
     meta: {},
     eventProducer: producer,
   };

@@ -14,6 +14,7 @@ function mockContext(producer = new EventProducer()): ChatAgentContext {
     runId: "run",
     modelId: "mock",
     messages: [],
+    tools: [],
     meta: {},
     eventProducer: producer,
   };
