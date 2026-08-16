@@ -157,12 +157,18 @@ describe("AiChatAgent", () => {
       ];
       const inputTools = [keep, drop];
       const capturing = chatExecutor as MockExecutor;
+      const started: ChatMessage[][] = [];
+      const producer = new EventProducer();
+      producer.emitter.on(EventName.ChatStart, (event) => {
+        started.push(event.messages);
+      });
       const localAgent = new AiChatAgent({
         chatExecutor: capturing,
+        eventProducer: producer,
         preRunTransformers: [
           {
             async transform(messages, context) {
-              await Promise.resolve();
+              await new Promise((resolve) => setTimeout(resolve, 20));
               context.tools = context.tools.filter(
                 (tool) => tool.name === keep.name,
               );
@@ -179,16 +185,51 @@ describe("AiChatAgent", () => {
       expect(capturing.execute.mock.calls[0][0].messages).toEqual([
         { role: "user", content: "hey" },
       ]);
+      expect(started).toEqual([[{ role: "user", content: "hey" }]]);
       expect(inputTools).toEqual([keep, drop]);
-      expect(inputMessages).toHaveLength(2);
+      expect(inputMessages).toEqual([
+        { role: "system", content: "ignore me" },
+        { role: "user", content: "hey" },
+      ]);
+    });
+    it("passes undefined tools to execute when the caller omits them", async () => {
+      const capturing = chatExecutor as MockExecutor;
+      await agent.getResponse({
+        messages: [{ role: "user", content: "hey" }],
+      });
+      expect(capturing.execute.mock.calls[0][0].tools).toBeUndefined();
+    });
+    it("runs preRun transformers once even when the tool loop continues", async () => {
+      let preRunCalls = 0;
+      const localAgent = new AiChatAgent({
+        chatExecutor,
+        preRunTransformers: [
+          {
+            transform(messages) {
+              preRunCalls += 1;
+              return messages;
+            },
+          },
+        ],
+      });
+      await localAgent.getResponse({
+        messages: [{ role: "user", content: "Calculate 3 + 4" }],
+        tools: [new CalculatorTool()],
+      });
+      expect(preRunCalls).toBe(1);
+      expect((chatExecutor as MockExecutor).execute.mock.calls.length).toBe(2);
     });
     it("uses context.tools mutated by a postToolCall transformer on the next executor call", async () => {
-      const seen: string[][] = [];
+      const seen: Array<string[] | undefined> = [];
+      const inputTools = [new CalculatorTool()];
+      const inputMessages: ChatMessage[] = [
+        { role: "user", content: "Calculate 3 + 4" },
+      ];
       const executor: ChatExecutor = {
         modelId: "mock-model-id",
         modelProvider: "mock-model-provider",
         execute: jest.fn(async (input: ChatExecutorInput) => {
-          seen.push((input.tools ?? []).map((tool) => tool.name));
+          seen.push(input.tools?.map((tool) => tool.name));
           const last = input.messages[input.messages.length - 1];
           if (last.role === "user") {
             const responseMessage: ChatMessage = {
@@ -227,11 +268,19 @@ describe("AiChatAgent", () => {
           },
         ],
       });
-      await localAgent.getResponse({
-        messages: [{ role: "user", content: "Calculate 3 + 4" }],
-        tools: [new CalculatorTool()],
+      const response = await localAgent.getResponse({
+        messages: inputMessages,
+        tools: inputTools,
       });
-      expect(seen).toEqual([["CalculatorTool"], []]);
+      expect(seen).toEqual([["CalculatorTool"], undefined]);
+      expect(response.responseMessage).toEqual({
+        role: "assistant",
+        content: "done",
+      });
+      expect(inputTools).toHaveLength(1);
+      expect(inputMessages).toEqual([
+        { role: "user", content: "Calculate 3 + 4" },
+      ]);
     });
   });
 

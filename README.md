@@ -131,7 +131,7 @@ Similarly, "vector search" on its own is out of scope. This tool may be used to 
 
 ### Post-processing and parsing
 
-The output from an agent should be simple enough for you to perform any post-processing outside of the agent. It should not need to be embedded in the agent, though you can use the `Transformer`s to process LLM responses before and after tools are called.
+The output from an agent should be simple enough for you to perform any post-processing outside of the agent. It should not need to be embedded in the agent, though you can use the `Transformer`s to process LLM responses before and after tools are called, or `preRunTransformers` to filter tools and incoming messages before the first model call.
 
 ### Text splitting
 

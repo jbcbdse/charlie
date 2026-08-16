@@ -74,7 +74,7 @@ export class BedrockChatExecutor implements ChatExecutor {
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const [systemPrompts, remainingMessages] =
       this.extractLeadingSystemMessages(messages);
-    if (tools && !this.toolsSupported) {
+    if (tools?.length && !this.toolsSupported) {
       systemPrompts.push(this.toolPromptGenerator.generateToolPrompt(tools));
     }
     if (context.systemPrompt) {

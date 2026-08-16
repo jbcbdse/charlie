@@ -81,11 +81,11 @@ export class AiChatAgent implements ChatAgent {
       systemPromptTemplate: this.systemPromptTemplate,
       systemPrompt: undefined,
     };
+    const chatStartMs = Date.now();
     for (const transformer of this.preRunTransformers) {
       context.messages = await transformer.transform(context.messages, context);
     }
     let started = false;
-    const chatStartMs = Date.now();
     let lastLlmResponseMessages: ChatMessage[] = [];
     do {
       // Synthesize the system prompt from the template and meta on each iteration
@@ -115,7 +115,7 @@ export class AiChatAgent implements ChatAgent {
       });
       const response = await this.chatExecutor.execute({
         messages: context.messages,
-        tools: context.tools,
+        tools: context.tools.length ? context.tools : undefined,
         context,
       });
       let newResponseMessages = response.responseMessages;
@@ -140,7 +140,7 @@ export class AiChatAgent implements ChatAgent {
       const toolCalls = newResponseMessages.filter(
         (m) => m.role === "tool_call",
       );
-      if (context.tools.length > 0 && toolCalls.length > 0) {
+      if (tools && toolCalls.length > 0) {
         const toolResponses = await this.executeToolCalls(
           toolCalls,
           context.tools,
