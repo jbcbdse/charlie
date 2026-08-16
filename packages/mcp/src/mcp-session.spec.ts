@@ -6,6 +6,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { EventProducer, type ChatAgentContext } from "@jbcbdse/charlie-core";
 import { McpSession } from "./mcp-session";
 import { McpSessions } from "./mcp-sessions";
+import { McpTool } from "./mcp-tool";
 import { parseMcpConfigFile } from "./parse-mcp-config";
 
 function mockContext(producer = new EventProducer()): ChatAgentContext {
@@ -99,6 +100,38 @@ describe("McpSession in-process", () => {
   });
 });
 
+describe("McpTool", () => {
+  const client = {} as Client;
+
+  it("adds properties when an object schema omits them", () => {
+    const tool = new McpTool(
+      client,
+      { name: "ping", inputSchema: { type: "object" } },
+      "svc__",
+    );
+    expect(tool.jsonSchema).toEqual({ type: "object", properties: {} });
+  });
+
+  it("sanitizes and truncates Charlie-facing tool names", () => {
+    const tool = new McpTool(client, { name: "echo" }, "my server__");
+    expect(tool.name).toBe("my_server__echo");
+    const long = new McpTool(client, { name: "x".repeat(80) }, "p__");
+    expect(long.name).toHaveLength(64);
+    expect(/^[a-zA-Z0-9_-]+$/.test(long.name)).toBe(true);
+  });
+
+  it("falls back to structuredContent when content is empty", async () => {
+    const client = {
+      callTool: async () => ({
+        content: [],
+        structuredContent: { ok: true },
+      }),
+    } as unknown as Client;
+    const tool = new McpTool(client, { name: "data" }, "");
+    await expect(tool.handle({}, mockContext())).resolves.toBe('{"ok":true}');
+  });
+});
+
 describe("parseMcpConfigFile", () => {
   it("maps command entries to stdio and url entries to http", () => {
     const dir = mkdtempSync(join(tmpdir(), "charlie-mcp-"));
@@ -130,6 +163,22 @@ describe("parseMcpConfigFile", () => {
       },
     ]);
   });
+
+  it("throws when mcpServers is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "charlie-mcp-"));
+    const path = join(dir, "mcp.json");
+    writeFileSync(path, JSON.stringify({}));
+    expect(() => parseMcpConfigFile(path)).toThrow("missing mcpServers");
+  });
+
+  it("throws when an entry has neither command nor url", () => {
+    const dir = mkdtempSync(join(tmpdir(), "charlie-mcp-"));
+    const path = join(dir, "mcp.json");
+    writeFileSync(path, JSON.stringify({ mcpServers: { broken: {} } }));
+    expect(() => parseMcpConfigFile(path)).toThrow(
+      'MCP server "broken" must have either command or url',
+    );
+  });
 });
 
 describe("McpSessions", () => {
@@ -146,5 +195,10 @@ describe("McpSessions", () => {
         },
       ]),
     ).rejects.toThrow("Duplicate MCP server name");
+  });
+
+  it("throws for an unknown server name", async () => {
+    const mcp = await McpSessions.connect([]);
+    expect(() => mcp.session("missing")).toThrow("Unknown MCP server");
   });
 });

@@ -1,5 +1,5 @@
 export { McpSession } from "./mcp-session";
-export { McpSessions, connectMcpSessions } from "./mcp-sessions";
+export { McpSessions } from "./mcp-sessions";
 export { parseMcpConfigFile } from "./parse-mcp-config";
 export type {
   McpServerConfig,

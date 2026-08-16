@@ -340,11 +340,6 @@ async function handleCmd(cmd: string): Promise<string | null> {
 async function startRepl() {
   const mcp = await loadOptionalMcp();
   tools = [...localTools, ...mcp.tools];
-  const shutdown = () => {
-    void mcp.close();
-  };
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
   await sleep(1);
   console.log("Welcome to the chatbot REPL");
   console.log(`Using agent ${currentAgent}`);
@@ -361,6 +356,12 @@ async function startRepl() {
     },
     ignoreUndefined: true,
   });
+  r.on("exit", () => {
+    void mcp.close();
+  });
 }
 
-void startRepl();
+startRepl().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

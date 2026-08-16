@@ -22,12 +22,9 @@ export class McpTool implements ITool {
     private readonly definition: McpToolDefinition,
     namePrefix: string,
   ) {
-    this.name = `${namePrefix}${definition.name}`;
+    this.name = McpTool.charlieToolName(namePrefix, definition.name);
     this.description = definition.description ?? "";
-    this.jsonSchema = definition.inputSchema ?? {
-      type: "object",
-      properties: {},
-    };
+    this.jsonSchema = McpTool.normalizeJsonSchema(definition.inputSchema);
   }
 
   public async handle(
@@ -51,12 +48,41 @@ export class McpTool implements ITool {
             message,
           });
         },
+        resetTimeoutOnProgress: true,
       },
     );
-    const text = flattenMcpContent(result.content);
+    let text = flattenMcpContent(result.content);
+    if (!text && result.structuredContent !== undefined) {
+      text = JSON.stringify(result.structuredContent);
+    }
     if (result.isError) {
       throw new Error(text || `MCP tool ${this.definition.name} failed`);
     }
     return text;
+  }
+
+  private static charlieToolName(prefix: string, nativeName: string): string {
+    const sanitized = `${prefix}${nativeName}`
+      .replace(/[^a-zA-Z0-9_-]/g, "_")
+      .slice(0, 64);
+    if (!sanitized) {
+      throw new Error(`MCP tool name is empty after sanitizing: ${nativeName}`);
+    }
+    return sanitized;
+  }
+
+  private static normalizeJsonSchema(schema: unknown): unknown {
+    if (schema === undefined || schema === null) {
+      return { type: "object", properties: {} };
+    }
+    if (
+      typeof schema === "object" &&
+      !Array.isArray(schema) &&
+      (schema as { type?: unknown }).type === "object" &&
+      !("properties" in schema)
+    ) {
+      return { ...schema, properties: {} };
+    }
+    return schema;
   }
 }

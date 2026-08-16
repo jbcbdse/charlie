@@ -17,9 +17,19 @@ export class McpSessions {
       }
       seen.add(config.name);
     }
-    const sessions = await Promise.all(
+    const results = await Promise.allSettled(
       configs.map((config) => McpSession.connect(config)),
     );
+    const sessions = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
+    );
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    if (failure) {
+      await Promise.allSettled(sessions.map((session) => session.close()));
+      throw failure.reason;
+    }
     return new McpSessions(
       new Map(sessions.map((session) => [session.name, session])),
     );
@@ -68,14 +78,8 @@ export class McpSessions {
   }
 
   public async close(): Promise<void> {
-    await Promise.all(
+    await Promise.allSettled(
       [...this.sessionsByName.values()].map((session) => session.close()),
     );
   }
-}
-
-export function connectMcpSessions(
-  configs: McpServerConfig[],
-): Promise<McpSessions> {
-  return McpSessions.connect(configs);
 }

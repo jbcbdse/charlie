@@ -241,4 +241,7 @@ async function start() {
   });
 }
 
-void start();
+start().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { readFileSync, unlinkSync } from "node:fs";
 import { createRequire } from "node:module";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   EventName,
   EventProducer,
@@ -26,6 +29,23 @@ function everythingStdio(name = "everything"): McpServerConfig {
       args: [everythingEntry(), "stdio"],
     },
   };
+}
+
+function shellExec(command: string, args: string[]): string {
+  return `${[command, ...args].map((part) => JSON.stringify(part)).join(" ")}`;
+}
+
+async function expectProcessGone(pid: number): Promise<void> {
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`process ${pid} still running`);
 }
 
 function mockContext(producer = new EventProducer()): ChatAgentContext {
@@ -128,6 +148,73 @@ describe("server-everything over stdio", () => {
   });
 });
 
+describe("stdio lifecycle", () => {
+  it("connects after a large stderr burst from a non-Node child", async () => {
+    let timeout: NodeJS.Timeout | undefined;
+    const session = await Promise.race([
+      McpSession.connect({
+        name: "noisy",
+        transport: {
+          type: "stdio",
+          command: "sh",
+          args: [
+            "-c",
+            `head -c 200000 /dev/zero | tr '\\0' 'x' >&2; exec ${shellExec(process.execPath, [everythingEntry(), "stdio"])}`,
+          ],
+        },
+      }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error("stderr pipe deadlock")),
+          8000,
+        );
+      }),
+    ]);
+    clearTimeout(timeout);
+    try {
+      expect(session.tools().some((tool) => tool.name.endsWith("echo"))).toBe(
+        true,
+      );
+    } finally {
+      await session.close();
+    }
+  });
+
+  it("closes already-connected servers when another connect fails", async () => {
+    const pidFile = join(tmpdir(), `charlie-mcp-orphan-${process.pid}.txt`);
+    try {
+      await expect(
+        McpSessions.connect([
+          {
+            name: "good",
+            transport: {
+              type: "stdio",
+              command: "sh",
+              args: [
+                "-c",
+                `echo $$ > ${JSON.stringify(pidFile)}; exec ${shellExec(process.execPath, [everythingEntry(), "stdio"])}`,
+              ],
+            },
+          },
+          {
+            name: "bad",
+            transport: { type: "http", url: "http://127.0.0.1:1/mcp" },
+          },
+        ]),
+      ).rejects.toThrow();
+      const pid = Number(readFileSync(pidFile, "utf8"));
+      expect(pid).toBeGreaterThan(0);
+      await expectProcessGone(pid);
+    } finally {
+      try {
+        unlinkSync(pidFile);
+      } catch {
+        // ignore
+      }
+    }
+  });
+});
+
 describe("server-everything over Streamable HTTP", () => {
   let child: ChildProcess | undefined;
   let session: McpSession | undefined;
@@ -162,8 +249,11 @@ describe("server-everything over Streamable HTTP", () => {
   });
 
   afterAll(async () => {
-    await session?.close();
-    child?.kill("SIGTERM");
+    try {
+      await session?.close();
+    } finally {
+      child?.kill("SIGTERM");
+    }
   });
 
   it("calls echo over HTTP", async () => {

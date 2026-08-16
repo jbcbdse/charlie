@@ -28,9 +28,14 @@ export class McpSession {
   public static async connect(config: McpServerConfig): Promise<McpSession> {
     const client = new Client(McpSession.clientInfo);
     await client.connect(McpSession.createTransport(config.transport));
-    return McpSession.fromClient(config.name, client, {
-      toolNamePrefix: config.toolNamePrefix,
-    });
+    try {
+      return await McpSession.fromClient(config.name, client, {
+        toolNamePrefix: config.toolNamePrefix,
+      });
+    } catch (error) {
+      await client.close().catch(() => undefined);
+      throw error;
+    }
   }
 
   public static async fromClient(
@@ -48,7 +53,7 @@ export class McpSession {
   }
 
   public tools(): ITool[] {
-    return this.cachedTools;
+    return [...this.cachedTools];
   }
 
   public instructions(): string | undefined {
@@ -128,7 +133,7 @@ export class McpSession {
         args: config.args,
         env: config.env,
         cwd: config.cwd,
-        stderr: "pipe",
+        stderr: "ignore",
       });
     }
     return new StreamableHTTPClientTransport(new URL(config.url), {
