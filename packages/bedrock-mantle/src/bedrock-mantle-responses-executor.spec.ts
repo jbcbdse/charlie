@@ -91,7 +91,10 @@ describe("BedrockMantleMessagesExecutor", () => {
         };
         yield {
           type: "message_delta",
-          usage: { output_tokens: 3 },
+          usage: {
+            output_tokens: 3,
+            output_tokens_details: { thinking_tokens: 1 },
+          },
         };
       },
     });
@@ -130,6 +133,7 @@ describe("BedrockMantleMessagesExecutor", () => {
       inputTokens: 2,
       outputTokens: 3,
       totalTokens: 5,
+      reasoningTokens: 1,
     });
   });
 });

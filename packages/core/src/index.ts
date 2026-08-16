@@ -19,11 +19,19 @@ export {
   MessageToolCall,
   MessageUser,
   ChatRun,
+  TokenUsage,
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
 } from "./types";
-export { createChatRun } from "./chat-run";
+export { ChatRunGenerator } from "./chat-run";
+export {
+  CharlieStreamConsumer,
+  CharlieStreamPart,
+  CharlieReasoningPart,
+  CharlieUsagePart,
+  CharlieErrorPart,
+} from "./charlie-stream";
 export { events, EventSubscriber } from "./event-subscriber";
 export {
   EventName,

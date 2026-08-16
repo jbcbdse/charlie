@@ -38,6 +38,7 @@ describe("OpenAiChatExecutor streaming", () => {
             prompt_tokens: 1,
             completion_tokens: 2,
             total_tokens: 3,
+            completion_tokens_details: { reasoning_tokens: 4 },
           },
         },
       ]),
@@ -61,12 +62,12 @@ describe("OpenAiChatExecutor streaming", () => {
     expect(result.responseMessage).toEqual({
       role: "assistant",
       content: "Hello",
-      name: undefined,
     });
     expect(result.usage).toEqual({
       inputTokens: 1,
       outputTokens: 2,
       totalTokens: 3,
+      reasoningTokens: 4,
     });
     expect(chunks).toEqual([
       { type: "text", text: "Hel" },
@@ -219,7 +220,7 @@ describe("OpenAiChatExecutor streaming", () => {
       context: context(producer),
     });
     expect(result.responseMessages).toEqual([
-      { role: "assistant", content: "Let me check. ", name: undefined },
+      { role: "assistant", content: "Let me check. " },
       {
         role: "tool_call",
         toolCalls: [
@@ -264,7 +265,6 @@ describe("OpenAiChatExecutor streaming", () => {
     expect(result.responseMessage).toEqual({
       role: "assistant",
       content: "42",
-      name: undefined,
     });
   });
 });

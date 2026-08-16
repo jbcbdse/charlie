@@ -12,78 +12,88 @@ type Listener<T extends EventName> = (
   eventName: T,
 ) => void;
 
-export function createChatRun(
-  producer: EventProducer,
-  runId: string,
-  work: () => Promise<ChatAgentGetResponseOutput>,
-): ChatRun {
-  const subscriber = new EventSubscriber(producer);
-  const wrappers = new Map<
+export class ChatRunGenerator {
+  private readonly subscriber: EventSubscriber;
+  private readonly wrappers = new Map<
     EventName,
     Map<Listener<EventName>, Listener<EventName>>
   >();
+  private settled = false;
+  private readonly promise: Promise<ChatAgentGetResponseOutput>;
+  private readonly run: ChatRun;
 
-  const promise = new Promise<ChatAgentGetResponseOutput>((resolve, reject) => {
-    queueMicrotask(() => {
-      try {
-        work().then(resolve, reject);
-      } catch (err) {
-        reject(err);
-      }
+  constructor(
+    producer: EventProducer,
+    private readonly runId: string,
+    work: () => Promise<ChatAgentGetResponseOutput>,
+  ) {
+    this.subscriber = new EventSubscriber(producer);
+    this.promise = new Promise((resolve, reject) => {
+      queueMicrotask(() => {
+        try {
+          work().then(resolve, reject);
+        } catch (err) {
+          reject(err);
+        }
+      });
     });
-  });
+    void this.promise.finally(() => this.offAll()).catch(() => undefined);
+    this.run = this.promise as ChatRun;
+    this.run.on = (eventName, listener) => this.on(eventName, listener);
+    this.run.off = (eventName, listener) => this.off(eventName, listener);
+    this.run[Symbol.asyncIterator] = () => this.iterate();
+  }
 
-  let settled = false;
-  const offAll = () => {
-    settled = true;
-    for (const [eventName, listeners] of wrappers) {
-      for (const wrapped of listeners.values()) {
-        subscriber.off(eventName, wrapped);
-      }
-    }
-    wrappers.clear();
-  };
+  public create(): ChatRun {
+    return this.run;
+  }
 
-  void promise.finally(offAll).catch(() => undefined);
-
-  const run = promise as ChatRun;
-
-  run.on = <T extends EventName>(eventName: T, listener: Listener<T>) => {
-    if (settled) return;
+  private on<T extends EventName>(eventName: T, listener: Listener<T>): void {
+    if (this.settled) return;
     const wrapped: Listener<T> = (event, name) => {
-      if (event.context.runId !== runId) return;
+      if (event.context.runId !== this.runId) return;
       try {
         listener(event, name);
       } catch {
         // Consumer faults must not reject the run.
       }
     };
-    let byListener = wrappers.get(eventName);
+    let byListener = this.wrappers.get(eventName);
     if (!byListener) {
       byListener = new Map();
-      wrappers.set(eventName, byListener);
+      this.wrappers.set(eventName, byListener);
     }
     const previous = byListener.get(listener as Listener<EventName>);
     if (previous) {
-      subscriber.off(eventName, previous);
+      this.subscriber.off(eventName, previous);
     }
     byListener.set(
       listener as Listener<EventName>,
       wrapped as Listener<EventName>,
     );
-    subscriber.on(eventName, wrapped);
-  };
+    this.subscriber.on(eventName, wrapped);
+  }
 
-  run.off = <T extends EventName>(eventName: T, listener: Listener<T>) => {
-    const byListener = wrappers.get(eventName);
+  private off<T extends EventName>(eventName: T, listener: Listener<T>): void {
+    const byListener = this.wrappers.get(eventName);
     const wrapped = byListener?.get(listener as Listener<EventName>);
     if (wrapped) {
-      subscriber.off(eventName, wrapped);
+      this.subscriber.off(eventName, wrapped);
       byListener?.delete(listener as Listener<EventName>);
     }
-  };
+  }
 
-  run[Symbol.asyncIterator] = async function* () {
+  private offAll(): void {
+    this.settled = true;
+    for (const [eventName, listeners] of this.wrappers) {
+      for (const wrapped of listeners.values()) {
+        this.subscriber.off(eventName, wrapped);
+      }
+    }
+    this.wrappers.clear();
+  }
+
+  private async *iterate(): AsyncGenerator<EventChatStreamChunk> {
     const queue: EventChatStreamChunk[] = [];
     let done = false;
     let failed = false;
@@ -93,8 +103,8 @@ export function createChatRun(
       queue.push(event);
       notify?.();
     };
-    run.on(EventName.ChatStreamChunk, onChunk);
-    void promise.then(
+    this.on(EventName.ChatStreamChunk, onChunk);
+    void this.promise.then(
       () => {
         done = true;
         notify?.();
@@ -119,9 +129,7 @@ export function createChatRun(
       }
       if (failed) throw failure;
     } finally {
-      run.off(EventName.ChatStreamChunk, onChunk);
+      this.off(EventName.ChatStreamChunk, onChunk);
     }
-  };
-
-  return run;
+  }
 }

@@ -5,7 +5,8 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "declaration": true,
-    "composite": true
+    "composite": true,
+    "types": ["node", "jest"]
   },
   "include": ["./src/**/*.ts"],
   "exclude": ["./*.ts"]

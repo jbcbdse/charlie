@@ -12,6 +12,12 @@ describe("GeminiExecutor streaming", () => {
       },
       response: Promise.resolve({
         candidates: [{ content: { role: "model", parts: [] } }],
+        usageMetadata: {
+          promptTokenCount: 1,
+          candidatesTokenCount: 2,
+          thoughtsTokenCount: 3,
+          totalTokenCount: 6,
+        },
       }),
     });
     const executor = new GeminiExecutor({
@@ -37,6 +43,12 @@ describe("GeminiExecutor streaming", () => {
     expect(result.responseMessage).toEqual({
       role: "assistant",
       content: "",
+    });
+    expect(result.usage).toEqual({
+      inputTokens: 1,
+      outputTokens: 2,
+      totalTokens: 6,
+      reasoningTokens: 3,
     });
     expect(producer.emitter.listenerCount(EventName.ChatStreamChunk)).toBe(0);
   });

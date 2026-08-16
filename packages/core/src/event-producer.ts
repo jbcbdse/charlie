@@ -4,6 +4,7 @@ import {
   ChatMessage,
   MessageTool,
   MessageToolCall,
+  TokenUsage,
 } from "./types";
 
 interface ChatEvent {
@@ -58,11 +59,7 @@ export interface EventChatExecutorEnd extends ChatEndEvent {
   startTime: number;
   timeMs: number;
   responseMessages: ChatMessage[];
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-  };
+  usage?: TokenUsage;
 }
 export interface EventChatRawRequest extends ChatEvent {
   modelId: string;
@@ -76,9 +73,7 @@ export interface EventChatRawResponse extends ChatEndEvent {
 }
 export interface EventToolProgress extends ChatEvent {
   message: string;
-  /** Stamped by ToolExecutor during handle(). */
   toolName?: string;
-  /** Stamped by ToolExecutor during handle(). */
   toolCallId?: string;
 }
 export type LogLevel = "error" | "warn" | "info" | "debug" | "verbose";
@@ -184,7 +179,21 @@ export class EventProducer {
     this.emitter.setMaxListeners(0);
   }
   public emit<T extends EventName>(eventName: T, event: EventTypeMap[T]): void {
-    this.emitter.emit(eventName, event, eventName);
+    this.emitter.emit(eventName, this.withToolStamp(eventName, event), eventName);
+  }
+
+  private withToolStamp<T extends EventName>(
+    eventName: T,
+    event: EventTypeMap[T],
+  ): EventTypeMap[T] {
+    if (
+      eventName !== EventName.ToolProgress &&
+      eventName !== EventName.Log
+    ) {
+      return event;
+    }
+    const { toolName, toolCallId } = event.context;
+    return { ...event, toolName, toolCallId };
   }
 }
 

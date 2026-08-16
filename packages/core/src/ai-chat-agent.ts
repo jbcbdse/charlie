@@ -16,7 +16,7 @@ import { EventName, eventProducer, EventProducer } from "./event-producer";
 import { newRunId } from "./new-run-id";
 import { ITool } from "./base-tool";
 import { TemplateSerializer } from "./template-serializer";
-import { createChatRun } from "./chat-run";
+import { ChatRunGenerator } from "./chat-run";
 
 export class AiChatAgent implements ChatAgent {
   private chatExecutor: ChatExecutor;
@@ -53,9 +53,9 @@ export class AiChatAgent implements ChatAgent {
     meta = {},
   }: ChatAgentGetResponseInput): ChatRun {
     const runId = newRunId();
-    return createChatRun(this.eventProducer, runId, () =>
+    return new ChatRunGenerator(this.eventProducer, runId, () =>
       this.runLoop({ messages, tools, meta, runId }),
-    );
+    ).create();
   }
 
   private async runLoop({

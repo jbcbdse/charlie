@@ -9,7 +9,12 @@ import { OpenAiResponsesExecutor } from "./openai-responses-executor";
 function completedStream(response: {
   output: unknown[];
   output_text?: string;
-  usage?: { input_tokens: number; output_tokens: number; total_tokens: number };
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    output_tokens_details?: { reasoning_tokens: number };
+  };
 }) {
   return {
     async *[Symbol.asyncIterator]() {
@@ -50,7 +55,12 @@ describe("OpenAiResponsesExecutor", () => {
           },
         ],
         output_text: "4",
-        usage: { input_tokens: 3, output_tokens: 1, total_tokens: 4 },
+        usage: {
+          input_tokens: 3,
+          output_tokens: 1,
+          total_tokens: 4,
+          output_tokens_details: { reasoning_tokens: 2 },
+        },
       }),
     );
     const executor = new OpenAiResponsesExecutor({
@@ -117,13 +127,14 @@ describe("OpenAiResponsesExecutor", () => {
       }),
     );
     expect(result.responseMessages).toEqual([
-      { role: "reasoning", id: "rsn_1", encryptedContent: "enc" },
       { role: "assistant", content: "4" },
+      { role: "reasoning", id: "rsn_1", encryptedContent: "enc" },
     ]);
     expect(result.usage).toEqual({
       inputTokens: 3,
       outputTokens: 1,
       totalTokens: 4,
+      reasoningTokens: 2,
     });
   });
 
@@ -240,8 +251,8 @@ describe("OpenAiResponsesExecutor", () => {
       { type: "text", text: "4" },
     ]);
     expect(result.responseMessages).toEqual([
-      { role: "reasoning", id: "rsn_1", encryptedContent: "enc" },
       { role: "assistant", content: "4" },
+      { role: "reasoning", id: "rsn_1", encryptedContent: "enc" },
     ]);
   });
 

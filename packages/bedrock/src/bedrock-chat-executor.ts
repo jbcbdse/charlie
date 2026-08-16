@@ -11,6 +11,8 @@ import {
   ChatMessage,
   ChatExecutorInput,
   EventName,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
@@ -139,26 +141,18 @@ export class BedrockChatExecutor implements ChatExecutor {
       throw err;
     }
     if (!stream) {
-      return {
-        responseMessage: { role: "assistant", content: "" },
-        responseMessages: [{ role: "assistant", content: "" }],
-      };
+      return new CharlieStreamConsumer(context, this).consume([]);
     }
-    const { responseMessages, usage } = await this.consumeStream(
-      stream,
-      context,
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(stream),
     );
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: { usage },
+      response: { usage: result.usage },
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    return {
-      responseMessage: responseMessages[responseMessages.length - 1],
-      responseMessages,
-      usage,
-    };
+    return result;
   }
 
   private async executeNonStream(
@@ -167,97 +161,48 @@ export class BedrockChatExecutor implements ChatExecutor {
     chatExecutorStartMs: number,
   ): Promise<ChatAgentGetResponseOutput> {
     const response = await this.client.converse(request);
-    const responseMessages = this.parseResponseContent(
-      response.output?.message?.content ?? [],
-      context,
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.converseToCharlieParts(response.output?.message?.content ?? []),
     );
-    const usage = response.usage && {
-      inputTokens: response.usage.inputTokens || 0,
-      outputTokens: response.usage.outputTokens || 0,
-      totalTokens: response.usage.totalTokens || 0,
-    };
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       response,
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    return {
-      responseMessage: responseMessages[responseMessages.length - 1] ?? {
-        role: "assistant",
-        content: "",
-      },
-      responseMessages:
-        responseMessages.length > 0
-          ? responseMessages
-          : [{ role: "assistant", content: "" }],
-      usage,
-    };
+    return result;
   }
 
-  private parseResponseContent(
+  private converseToCharlieParts(
     content: NonNullable<Message["content"]>,
-    context: ChatExecutorInput["context"],
-  ): ChatMessage[] {
-    return content.flatMap((contentBlock, index): ChatMessage[] => {
+  ): CharlieStreamPart[] {
+    const parts: CharlieStreamPart[] = [];
+    content.forEach((contentBlock, index) => {
       if (contentBlock.reasoningContent?.reasoningText?.text) {
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: {
-            type: "thinking",
-            text: contentBlock.reasoningContent.reasoningText.text,
-          },
+        parts.push({
+          type: "thinking",
+          text: contentBlock.reasoningContent.reasoningText.text,
         });
-        return [];
+        return;
       }
       if (contentBlock.text) {
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: { type: "text", text: contentBlock.text },
-        });
-        return [{ role: "assistant", content: contentBlock.text }];
+        parts.push({ type: "text", text: contentBlock.text });
+        return;
       }
       if (contentBlock.toolUse) {
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: {
-            type: "tool_call",
-            index,
-            id: contentBlock.toolUse.toolUseId,
-            name: contentBlock.toolUse.name,
-            argumentsText: JSON.stringify(contentBlock.toolUse.input ?? {}),
-          },
+        parts.push({
+          type: "tool_call",
+          index,
+          id: contentBlock.toolUse.toolUseId,
+          name: contentBlock.toolUse.name,
+          argumentsText: JSON.stringify(contentBlock.toolUse.input ?? {}),
         });
-        return [
-          {
-            role: "tool_call",
-            toolCalls: [
-              {
-                function: {
-                  name: contentBlock.toolUse.name || "",
-                  arguments: (contentBlock.toolUse.input ?? {}) as Record<
-                    string,
-                    unknown
-                  >,
-                },
-                id: contentBlock.toolUse.toolUseId || "",
-                type: "function",
-              },
-            ],
-          },
-        ];
       }
-      return [];
     });
+    return parts;
   }
 
-  private async consumeStream(
+  private async *toCharlieStream(
     stream: AsyncIterable<{
       contentBlockStart?: {
         start?: {
@@ -281,116 +226,41 @@ export class BedrockChatExecutor implements ChatExecutor {
         };
       };
     }>,
-    context: ChatExecutorInput["context"],
-  ): Promise<{
-    responseMessages: ChatMessage[];
-    usage?: {
-      inputTokens: number;
-      outputTokens: number;
-      totalTokens: number;
-    };
-  }> {
-    let text = "";
-    const tools = new Map<
-      number,
-      { id: string; name: string; arguments: string }
-    >();
-    let usage:
-      | { inputTokens: number; outputTokens: number; totalTokens: number }
-      | undefined;
-    for await (const event of stream) {
-      const start = event.contentBlockStart;
+  ): AsyncGenerator<CharlieStreamPart> {
+    for await (const part of stream) {
+      const start = part.contentBlockStart;
       if (start?.start?.toolUse) {
-        const index = start.contentBlockIndex ?? 0;
-        const acc = {
+        yield {
+          type: "tool_call",
+          index: start.contentBlockIndex ?? 0,
           id: start.start.toolUse.toolUseId || "",
           name: start.start.toolUse.name || "",
-          arguments: "",
         };
-        tools.set(index, acc);
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: {
-            type: "tool_call",
-            index,
-            id: acc.id,
-            name: acc.name,
-          },
-        });
       }
-      const delta = event.contentBlockDelta?.delta;
-      const index = event.contentBlockDelta?.contentBlockIndex ?? 0;
+      const delta = part.contentBlockDelta?.delta;
+      const index = part.contentBlockDelta?.contentBlockIndex ?? 0;
       if (delta?.text) {
-        text += delta.text;
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: { type: "text", text: delta.text },
-        });
+        yield { type: "text", text: delta.text };
       }
       if (delta?.reasoningContent?.text) {
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: { type: "thinking", text: delta.reasoningContent.text },
-        });
+        yield { type: "thinking", text: delta.reasoningContent.text };
       }
       if (delta?.toolUse?.input) {
-        const acc = tools.get(index) ?? {
-          id: "",
-          name: "",
-          arguments: "",
+        yield {
+          type: "tool_call",
+          index,
+          argumentsText: delta.toolUse.input,
         };
-        acc.arguments += delta.toolUse.input;
-        tools.set(index, acc);
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: {
-            type: "tool_call",
-            index,
-            id: acc.id,
-            name: acc.name,
-            argumentsText: delta.toolUse.input,
-          },
-        });
       }
-      if (event.metadata?.usage) {
-        usage = {
-          inputTokens: event.metadata.usage.inputTokens || 0,
-          outputTokens: event.metadata.usage.outputTokens || 0,
-          totalTokens: event.metadata.usage.totalTokens || 0,
+      if (part.metadata?.usage) {
+        yield {
+          type: "usage",
+          inputTokens: part.metadata.usage.inputTokens || 0,
+          outputTokens: part.metadata.usage.outputTokens || 0,
+          totalTokens: part.metadata.usage.totalTokens || 0,
         };
       }
     }
-    const responseMessages: ChatMessage[] = [];
-    if (text) {
-      responseMessages.push({ role: "assistant", content: text });
-    }
-    if (tools.size > 0) {
-      responseMessages.push({
-        role: "tool_call",
-        toolCalls: [...tools.entries()]
-          .sort(([a], [b]) => a - b)
-          .map(([, toolCall]) => ({
-            id: toolCall.id,
-            type: "function" as const,
-            function: {
-              name: toolCall.name,
-              arguments: this.parseArguments(toolCall.arguments),
-            },
-          })),
-      });
-    }
-    if (responseMessages.length === 0) {
-      responseMessages.push({ role: "assistant", content: "" });
-    }
-    return { responseMessages, usage };
   }
 
   private extractLeadingSystemMessages(
@@ -425,16 +295,5 @@ export class BedrockChatExecutor implements ChatExecutor {
       /doesn't support tool use in streaming mode/i.test(message) ||
       (name === "ValidationException" && /streaming mode/i.test(message))
     );
-  }
-
-  private parseArguments(raw: string): Record<string, unknown> {
-    try {
-      const parsed: unknown = JSON.parse(raw || "{}");
-      return parsed !== null && typeof parsed === "object"
-        ? (parsed as Record<string, unknown>)
-        : {};
-    } catch {
-      return {};
-    }
   }
 }

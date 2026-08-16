@@ -3,6 +3,8 @@ import {
   ChatExecutorInput,
   EventName,
   ChatAgentGetResponseOutput,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 import {
   GenerateContentRequest,
@@ -48,65 +50,76 @@ export class GeminiExecutor implements ChatExecutor {
       request: req,
     });
     const streamed = await this.model.generateContentStream(req);
-    let toolIndex = 0;
-    for await (const chunk of streamed.stream) {
-      const parts = chunk.candidates?.[0]?.content?.parts ?? [];
-      for (const part of parts) {
-        if ("thought" in part && part.thought && part.text) {
-          context.eventProducer.emit(EventName.ChatStreamChunk, {
-            context,
-            modelId: this.modelId,
-            modelProvider: this.modelProvider,
-            chunk: { type: "thinking", text: part.text },
-          });
-          continue;
-        }
-        if (part.text) {
-          context.eventProducer.emit(EventName.ChatStreamChunk, {
-            context,
-            modelId: this.modelId,
-            modelProvider: this.modelProvider,
-            chunk: { type: "text", text: part.text },
-          });
-        }
-        if (part.functionCall) {
-          context.eventProducer.emit(EventName.ChatStreamChunk, {
-            context,
-            modelId: this.modelId,
-            modelProvider: this.modelProvider,
-            chunk: {
-              type: "tool_call",
-              index: toolIndex++,
-              name: part.functionCall.name,
-              argumentsText: JSON.stringify(part.functionCall.args ?? {}),
-            },
-          });
-        }
-      }
-    }
-    const aggregated = await streamed.response;
+    let aggregated: unknown;
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(streamed, (response) => {
+        aggregated = response;
+      }),
+    );
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       modelId: this.modelId,
       response: aggregated,
       timeMs: Date.now() - startMs,
     });
-    const responseMessages = this.messageConverter.responseContentChatMessages(
-      aggregated.candidates?.[0]?.content ?? { role: "model", parts: [] },
-    );
-    if (responseMessages.length === 0) {
-      responseMessages.push({ role: "assistant", content: "" });
+    return result;
+  }
+
+  private async *toCharlieStream(
+    streamed: {
+      stream: AsyncIterable<unknown>;
+      response: Promise<unknown>;
+    },
+    onAggregated: (response: unknown) => void,
+  ): AsyncGenerator<CharlieStreamPart> {
+    let toolIndex = 0;
+    for await (const raw of streamed.stream) {
+      const chunk = raw as {
+        candidates?: { content?: { parts?: unknown[] } }[];
+      };
+      const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+      for (const part of parts as {
+        thought?: boolean;
+        text?: string;
+        functionCall?: { name: string; args?: Record<string, unknown> };
+      }[]) {
+        if (part.thought && part.text) {
+          yield { type: "thinking", text: part.text };
+          continue;
+        }
+        if (part.text) {
+          yield { type: "text", text: part.text };
+        }
+        if (part.functionCall) {
+          yield {
+            type: "tool_call",
+            index: toolIndex++,
+            name: part.functionCall.name,
+            argumentsText: JSON.stringify(part.functionCall.args ?? {}),
+          };
+        }
+      }
     }
-    return {
-      responseMessage: responseMessages[responseMessages.length - 1],
-      responseMessages,
-      usage: aggregated.usageMetadata && {
+    const aggregated = (await streamed.response) as {
+      usageMetadata?: {
+        promptTokenCount?: number;
+        cachedContentTokenCount?: number;
+        candidatesTokenCount?: number;
+        thoughtsTokenCount?: number;
+        totalTokenCount?: number;
+      };
+    };
+    onAggregated(aggregated);
+    if (aggregated.usageMetadata) {
+      yield {
+        type: "usage",
         inputTokens:
           (aggregated.usageMetadata.promptTokenCount || 0) +
           (aggregated.usageMetadata.cachedContentTokenCount || 0),
-        outputTokens: aggregated.usageMetadata.candidatesTokenCount,
-        totalTokens: aggregated.usageMetadata.totalTokenCount,
-      },
-    };
+        outputTokens: aggregated.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: aggregated.usageMetadata.totalTokenCount || 0,
+        reasoningTokens: aggregated.usageMetadata.thoughtsTokenCount,
+      };
+    }
   }
 }

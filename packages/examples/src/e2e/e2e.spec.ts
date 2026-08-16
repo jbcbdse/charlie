@@ -22,7 +22,12 @@ interface ChatResponse {
   response: string;
   agent: string;
   messages: ChatMessage[];
-  usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    reasoningTokens?: number;
+  };
   events?: CapturedEvent[];
 }
 

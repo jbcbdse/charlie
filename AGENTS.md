@@ -62,7 +62,7 @@ for await (const { chunk } of run) {
 const result = await run;
 ```
 
-Executors always use the provider stream API, accumulate the full messages, and return the same `ChatAgentGetResponseOutput` as before. They emit `chat:stream:chunk` (`EventName.ChatStreamChunk`) for append-only slices: `text`, `thinking`, or `tool_call`. Thinking tokens are never concatenated into `MessageAssistant.content`. When the provider needs a round-trip (OpenAI Responses encrypted reasoning, Anthropic thinking signatures), also persist a `MessageReasoning` in `responseMessages`. Completions-style `reasoning_content` stays stream-only. On `tool_call` chunks, `id` and `name` are last-wins (often only on the first slice); `argumentsText` is append-only.
+Executors always use the provider stream API and map vendor parts into a common `CharlieStreamPart` stream (`text`, `thinking`, `tool_call`, `reasoning`, `usage`, `error`). `CharlieStreamConsumer` in core emits `chat:stream:chunk` and folds parts into `responseMessages`. Thinking tokens are never concatenated into `MessageAssistant.content`. Yield `reasoning` when the provider needs a round-trip (OpenAI Responses encrypted reasoning, Anthropic thinking signatures). Completions-style `reasoning_content` stays `thinking` (stream-only). On `tool_call` parts, `id` and `name` are last-wins; `argumentsText` is append-only.
 
 **Tools** extend `BaseTool` with a Zod schema and an async `handler`. Setting `returnDirect = true` on a tool causes the agent to stop the loop and return the tool result directly without re-entering the LLM — useful for side-effect tools like account deletion.
 

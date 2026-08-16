@@ -7,6 +7,8 @@ import {
   ChatExecutorInput,
   TemplateSerializer,
   EventName,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 
 export interface OpenAiChatExecutorOptions {
@@ -75,26 +77,38 @@ export class OpenAiChatExecutor implements ChatExecutor {
       stream: true,
       stream_options: { include_usage: true },
     });
-    let content = "";
-    const toolAcc = new Map<
-      number,
-      { id: string; name: string; arguments: string }
-    >();
-    let usage:
-      | {
+    let lastChunk: unknown;
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(stream, (part) => {
+        lastChunk = part;
+      }),
+    );
+    context.eventProducer.emit(EventName.ChatRawResponse, {
+      context,
+      response: lastChunk,
+      modelId: this.modelId,
+      timeMs: Date.now() - chatExecutorStartMs,
+    });
+    return result;
+  }
+
+  private async *toCharlieStream(
+    stream: AsyncIterable<unknown>,
+    onPart: (part: unknown) => void,
+  ): AsyncGenerator<CharlieStreamPart> {
+    const toolIds = new Map<string, number>();
+    let nextIndex = 0;
+    for await (const raw of stream) {
+      onPart(raw);
+      const part = raw as {
+        usage?: {
           prompt_tokens: number;
           completion_tokens: number;
           total_tokens: number;
-        }
-      | undefined;
-    let lastChunk: unknown;
-    for await (const part of stream) {
-      lastChunk = part;
-      if (part.usage) {
-        usage = part.usage;
-      }
-      const delta = part.choices[0]?.delta as
-        | {
+          completion_tokens_details?: { reasoning_tokens?: number };
+        };
+        choices?: {
+          delta?: {
             content?: string | null;
             reasoning_content?: string | null;
             reasoning?: string | null;
@@ -103,100 +117,46 @@ export class OpenAiChatExecutor implements ChatExecutor {
               id?: string;
               function?: { name?: string; arguments?: string };
             }[];
-          }
-        | undefined;
+          };
+        }[];
+      };
+      if (part.usage) {
+        yield {
+          type: "usage",
+          inputTokens: part.usage.prompt_tokens,
+          outputTokens: part.usage.completion_tokens,
+          totalTokens: part.usage.total_tokens,
+          reasoningTokens:
+            part.usage.completion_tokens_details?.reasoning_tokens,
+        };
+      }
+      const delta = part.choices?.[0]?.delta;
       if (!delta) continue;
       if (delta.content) {
-        content += delta.content;
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: { type: "text", text: delta.content },
-        });
+        yield { type: "text", text: delta.content };
       }
       const thinking = delta.reasoning_content || delta.reasoning;
       if (thinking) {
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: { type: "thinking", text: thinking },
-        });
+        yield { type: "thinking", text: thinking };
       }
       for (const toolCall of delta.tool_calls ?? []) {
-        const index =
-          toolCall.index ??
-          (toolCall.id
-            ? ([...toolAcc.entries()].find(
-                ([, acc]) => acc.id === toolCall.id,
-              )?.[0] ?? toolAcc.size)
-            : 0);
-        const acc = toolAcc.get(index) ?? { id: "", name: "", arguments: "" };
-        if (toolCall.id) acc.id = toolCall.id;
-        if (toolCall.function?.name) acc.name ||= toolCall.function.name;
-        if (toolCall.function?.arguments) {
-          acc.arguments += toolCall.function.arguments;
+        let index = toolCall.index;
+        if (index === undefined && toolCall.id && toolIds.has(toolCall.id)) {
+          index = toolIds.get(toolCall.id);
         }
-        toolAcc.set(index, acc);
-        context.eventProducer.emit(EventName.ChatStreamChunk, {
-          context,
-          modelId: this.modelId,
-          modelProvider: this.modelProvider,
-          chunk: {
-            type: "tool_call",
-            index,
-            id: toolCall.id,
-            name: toolCall.function?.name,
-            argumentsText: toolCall.function?.arguments,
-          },
-        });
+        if (index === undefined) {
+          index = toolCall.id ? nextIndex++ : 0;
+        }
+        if (toolCall.id) toolIds.set(toolCall.id, index);
+        yield {
+          type: "tool_call",
+          index,
+          id: toolCall.id,
+          name: toolCall.function?.name,
+          argumentsText: toolCall.function?.arguments,
+        };
       }
     }
-    context.eventProducer.emit(EventName.ChatRawResponse, {
-      context,
-      response: lastChunk,
-      modelId: this.modelId,
-      timeMs: Date.now() - chatExecutorStartMs,
-    });
-    const responseMessages = this.accumulatedToChatMessages(content, toolAcc);
-    return {
-      responseMessage: responseMessages[responseMessages.length - 1],
-      responseMessages,
-      usage: usage && {
-        inputTokens: usage.prompt_tokens,
-        outputTokens: usage.completion_tokens,
-        totalTokens: usage.total_tokens,
-      },
-    };
-  }
-
-  private accumulatedToChatMessages(
-    content: string,
-    toolAcc: Map<number, { id: string; name: string; arguments: string }>,
-  ): ChatMessage[] {
-    const messages: ChatMessage[] = [];
-    if (content) {
-      messages.push({ role: "assistant", content, name: undefined });
-    }
-    if (toolAcc.size > 0) {
-      messages.push({
-        role: "tool_call",
-        toolCalls: [...toolAcc.entries()]
-          .sort(([a], [b]) => a - b)
-          .map(([, toolCall]) => ({
-            function: {
-              name: toolCall.name,
-              arguments: this.parseArguments(toolCall.arguments),
-            },
-            type: "function" as const,
-            id: toolCall.id,
-          })),
-      });
-    }
-    return messages.length > 0
-      ? messages
-      : [{ role: "assistant", content, name: undefined }];
   }
 
   private toOpenAiMessages(messages: ChatMessage[]): OpenAiChatMessage[] {
@@ -248,16 +208,5 @@ export class OpenAiChatExecutor implements ChatExecutor {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         throw new Error(`Unknown message role: ${(msg as any)?.role}`);
       });
-  }
-
-  private parseArguments(raw: string): Record<string, unknown> {
-    try {
-      const parsed: unknown = JSON.parse(raw || "{}");
-      return parsed !== null && typeof parsed === "object"
-        ? (parsed as Record<string, unknown>)
-        : {};
-    } catch {
-      return {};
-    }
   }
 }

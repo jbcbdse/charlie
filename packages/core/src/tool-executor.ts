@@ -1,5 +1,5 @@
 import { ITool } from "./base-tool";
-import { EventName, EventProducer, EventTypeMap } from "./event-producer";
+import { EventName } from "./event-producer";
 import { ChatAgentContext, MessageTool, MessageToolCall } from "./types";
 
 /**
@@ -34,31 +34,11 @@ export class ToolExecutor {
           toolCall: toolCallMessage,
           toolCallId: toolCall.id,
         });
-        const stampedProducer: EventProducer = {
-          emitter: context.eventProducer.emitter,
-          emit: (eventName, event) => {
-            if (
-              eventName === EventName.ToolProgress ||
-              eventName === EventName.Log
-            ) {
-              context.eventProducer.emit(eventName, {
-                ...event,
-                toolName: tool.name,
-                toolCallId: toolCall.id,
-              } as EventTypeMap[typeof eventName]);
-              return;
-            }
-            context.eventProducer.emit(eventName, event);
-          },
-        };
-        const toolContext = new Proxy(context, {
-          get(target, prop, receiver) {
-            if (prop === "eventProducer") return stampedProducer;
-            return Reflect.get(target, prop, receiver);
-          },
-        });
         const toolMessage = await tool
-          .handle(toolCall.function.arguments, toolContext)
+          .handle(
+            toolCall.function.arguments,
+            this.withTool(context, tool.name, toolCall.id),
+          )
           .then((toolResult) => ({
             role: "tool" as const,
             content: toolResult,
@@ -87,5 +67,25 @@ export class ToolExecutor {
       }),
     );
     return toolMessages;
+  }
+
+  /**
+   * Tools emit progress and logs without naming themselves. Overlay the current
+   * call's identity so `emit` can stamp `toolName` / `toolCallId` for subscribers.
+   * A Proxy keeps the same context object (tools mutate it; calls run in parallel)
+   * instead of a copy that would drop those writes.
+   */
+  private withTool(
+    context: ChatAgentContext,
+    toolName: string,
+    toolCallId: string,
+  ): ChatAgentContext {
+    return new Proxy(context, {
+      get(target, prop, receiver) {
+        if (prop === "toolName") return toolName;
+        if (prop === "toolCallId") return toolCallId;
+        return Reflect.get(target, prop, receiver);
+      },
+    });
   }
 }
