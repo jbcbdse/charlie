@@ -5,6 +5,8 @@ import {
   ChatMessage,
   ChatExecutorInput,
   EventName,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutorOptions } from "./openai-chat-executor";
 
@@ -13,7 +15,6 @@ export type OpenAiResponsesExecutorOptions = OpenAiChatExecutorOptions & {
 };
 
 type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
-type ResponseOutputItem = OpenAI.Responses.ResponseOutputItem;
 
 export class OpenAiResponsesExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
@@ -39,12 +40,13 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
     tools,
     context,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
-    const request: OpenAI.Responses.ResponseCreateParamsNonStreaming = {
+    const request: OpenAI.Responses.ResponseCreateParamsStreaming = {
       model: this.options.modelId,
       input: this.toInputItems(messages),
       instructions: context.systemPrompt,
       store: false,
       include: ["reasoning.encrypted_content"],
+      stream: true,
       tools:
         tools &&
         tools.map((tool) => ({
@@ -62,33 +64,136 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const data = await this.openAiClient.responses.create(request);
+    const stream = await this.openAiClient.responses.create(request);
+    let completed: OpenAI.Responses.Response | undefined;
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(stream, (response) => {
+        completed = response;
+      }),
+    );
+    if (!completed) {
+      throw new Error("Responses stream ended without a completed response");
+    }
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: data,
+      response: completed,
       modelId: this.modelId,
       timeMs: Date.now() - startMs,
     });
-    const responseMessages = this.outputToChatMessages(data.output);
-    const responseMessage = [...responseMessages]
-      .reverse()
-      .find((m) => m.role !== "reasoning") ??
-      responseMessages[responseMessages.length - 1] ?? {
-        role: "assistant" as const,
-        content: data.output_text || "",
-      };
-    return {
-      responseMessage,
-      responseMessages:
-        responseMessages.length > 0
-          ? responseMessages
-          : [{ role: "assistant", content: data.output_text || "" }],
-      usage: data.usage && {
-        inputTokens: data.usage.input_tokens,
-        outputTokens: data.usage.output_tokens,
-        totalTokens: data.usage.total_tokens,
-      },
-    };
+    return result;
+  }
+
+  private async *toCharlieStream(
+    stream: AsyncIterable<unknown>,
+    onCompleted: (response: OpenAI.Responses.Response) => void,
+  ): AsyncGenerator<CharlieStreamPart> {
+    let sawToolCall = false;
+    for await (const raw of stream) {
+      const part = raw as { type: string; [key: string]: unknown };
+      if (part.type === "response.output_text.delta" && part.delta) {
+        yield { type: "text", text: String(part.delta) };
+      }
+      if (
+        (part.type === "response.reasoning_text.delta" ||
+          part.type === "response.reasoning_summary_text.delta") &&
+        part.delta
+      ) {
+        yield { type: "thinking", text: String(part.delta) };
+      }
+      if (
+        part.type === "response.output_item.added" &&
+        part.item &&
+        typeof part.item === "object" &&
+        "type" in part.item &&
+        part.item.type === "function_call"
+      ) {
+        const item = part.item as { call_id?: string; name?: string };
+        sawToolCall = true;
+        yield {
+          type: "tool_call",
+          index: Number(part.output_index ?? 0),
+          id: item.call_id,
+          name: item.name,
+        };
+      }
+      if (
+        part.type === "response.function_call_arguments.delta" &&
+        part.delta
+      ) {
+        sawToolCall = true;
+        yield {
+          type: "tool_call",
+          index: Number(part.output_index ?? 0),
+          argumentsText: String(part.delta),
+        };
+      }
+      if (part.type === "error") {
+        yield {
+          type: "error",
+          error: new Error(
+            typeof part.message === "string"
+              ? part.message
+              : "Responses stream error",
+          ),
+        };
+      }
+      if (part.type === "response.failed") {
+        const response = part.response as
+          | { error?: { message?: string } }
+          | undefined;
+        yield {
+          type: "error",
+          error: new Error(
+            response?.error?.message || "Responses request failed",
+          ),
+        };
+      }
+      if (part.type === "response.incomplete") {
+        const response = part.response as
+          | { incomplete_details?: { reason?: string } }
+          | undefined;
+        yield {
+          type: "error",
+          error: new Error(
+            response?.incomplete_details?.reason ||
+              "Responses request incomplete",
+          ),
+        };
+      }
+      if (part.type === "response.completed") {
+        const response = part.response as OpenAI.Responses.Response;
+        onCompleted(response);
+        if (response.usage) {
+          yield {
+            type: "usage",
+            inputTokens: response.usage.input_tokens,
+            outputTokens: response.usage.output_tokens,
+            totalTokens: response.usage.total_tokens,
+            reasoningTokens:
+              response.usage.output_tokens_details?.reasoning_tokens,
+          };
+        }
+        let toolIndex = 0;
+        for (const item of response.output ?? []) {
+          if (item.type === "reasoning") {
+            yield {
+              type: "reasoning",
+              id: item.id,
+              encryptedContent: item.encrypted_content ?? undefined,
+            };
+          }
+          if (!sawToolCall && item.type === "function_call") {
+            yield {
+              type: "tool_call",
+              index: toolIndex++,
+              id: item.call_id,
+              name: item.name,
+              argumentsText: item.arguments,
+            };
+          }
+        }
+      }
+    }
   }
 
   private toInputItems(messages: ChatMessage[]): ResponseInputItem[] {
@@ -139,71 +244,5 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       throw new Error(`Unknown message role: ${(msg as any)?.role}`);
     }
     return items;
-  }
-
-  private outputToChatMessages(output: ResponseOutputItem[]): ChatMessage[] {
-    const messages: ChatMessage[] = [];
-    const pendingToolCalls: ChatMessage & { role: "tool_call" } = {
-      role: "tool_call",
-      toolCalls: [],
-    };
-    const flushToolCalls = () => {
-      if (pendingToolCalls.toolCalls.length > 0) {
-        messages.push({
-          role: "tool_call",
-          toolCalls: pendingToolCalls.toolCalls,
-        });
-        pendingToolCalls.toolCalls = [];
-      }
-    };
-    for (const item of output) {
-      if (item.type === "reasoning") {
-        flushToolCalls();
-        messages.push({
-          role: "reasoning",
-          id: item.id,
-          encryptedContent: item.encrypted_content ?? undefined,
-        });
-        continue;
-      }
-      if (item.type === "message") {
-        flushToolCalls();
-        const text = item.content
-          .map((part) =>
-            part.type === "output_text"
-              ? part.text
-              : part.type === "refusal"
-                ? part.refusal
-                : "",
-          )
-          .join("");
-        messages.push({ role: "assistant", content: text });
-        continue;
-      }
-      if (item.type === "function_call") {
-        pendingToolCalls.toolCalls.push({
-          id: item.call_id,
-          type: "function",
-          function: {
-            name: item.name,
-            arguments: parseArguments(item.arguments),
-          },
-        });
-        continue;
-      }
-    }
-    flushToolCalls();
-    return messages;
-  }
-}
-
-function parseArguments(raw: string): Record<string, unknown> {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    return parsed !== null && typeof parsed === "object"
-      ? (parsed as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
   }
 }

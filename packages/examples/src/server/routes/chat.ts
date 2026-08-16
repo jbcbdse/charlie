@@ -2,6 +2,7 @@
 import { Request, Response } from "express";
 import {
   ChatAgent,
+  ChatAgentGetResponseOutput,
   ChatMessage,
   EventLog,
   EventName,
@@ -18,6 +19,7 @@ interface ChatRequest {
   agent?: AvailableAgent;
   messages?: ChatMessage[];
   user?: Record<string, string>;
+  stream?: boolean;
 }
 
 interface CapturedEvent {
@@ -25,6 +27,29 @@ interface CapturedEvent {
   message: string;
   level?: EventLog["level"];
   meta?: EventLog["meta"];
+}
+
+function toJsonBody(
+  result: ChatAgentGetResponseOutput,
+  history: ChatMessage[],
+  agent: AvailableAgent,
+  captured: CapturedEvent[],
+) {
+  const assistantMessages = result.responseMessages.filter(
+    (m) => m.role === "assistant",
+  );
+  const responseText = assistantMessages.map((m) => m.content).join("\n");
+  const updatedMessages: ChatMessage[] = [
+    ...history,
+    ...result.responseMessages,
+  ];
+  return {
+    response: responseText,
+    agent,
+    messages: updatedMessages,
+    usage: result.usage,
+    events: captured,
+  };
 }
 
 export function chatHandler(
@@ -39,6 +64,7 @@ export function chatHandler(
       agent = "claude",
       messages = [],
       user = {},
+      stream = false,
     }: ChatRequest = req.body;
 
     if (!message) {
@@ -54,12 +80,73 @@ export function chatHandler(
 
     const userMessage: MessageUser = { role: "user", content: message };
     const history: ChatMessage[] = [...messages, userMessage];
-
-    // Tag every event from this request via meta.requestId so we can pull our
-    // own events out of the shared producer without picking up concurrent
-    // requests' events.
     const requestId = randomUUID();
     const captured: CapturedEvent[] = [];
+    const meta = {
+      requestId,
+      user: {
+        first_name: "Jonathan",
+        last_name: "Barnett",
+        preferred_name: "Jon",
+        ...user,
+      },
+      availableAgents,
+    };
+
+    if (stream) {
+      res.status(200);
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      const writeEvent = (event: string, data: unknown) => {
+        if (res.writableEnded || res.destroyed) return;
+        res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+      try {
+        const run = agents[agent].getResponse({
+          messages: history,
+          tools,
+          meta,
+        });
+        run.on(EventName.ChatStreamChunk, ({ chunk }) => {
+          writeEvent("chunk", chunk);
+        });
+        run.on(EventName.ToolProgress, (event) => {
+          captured.push({
+            name: EventName.ToolProgress,
+            message: event.message,
+          });
+          writeEvent("tool:progress", {
+            message: event.message,
+            toolName: event.toolName,
+            toolCallId: event.toolCallId,
+          });
+        });
+        run.on(EventName.Log, (event) => {
+          captured.push({
+            name: EventName.Log,
+            message: event.message,
+            level: event.level,
+            meta: event.meta,
+          });
+          writeEvent("log", {
+            message: event.message,
+            level: event.level,
+            meta: event.meta,
+          });
+        });
+        const result = await run;
+        writeEvent("done", toJsonBody(result, history, agent, captured));
+        res.end();
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err.message : String(err);
+        console.error("Chat error:", err);
+        writeEvent("error", { error });
+        res.end();
+      }
+      return;
+    }
+
     const onProgress = (event: EventToolProgress): void => {
       if (event.context.meta.requestId === requestId) {
         captured.push({
@@ -85,35 +172,13 @@ export function chatHandler(
       const result = await agents[agent].getResponse({
         messages: history,
         tools,
-        meta: {
-          requestId,
-          user: {
-            first_name: "Jonathan",
-            last_name: "Barnett",
-            preferred_name: "Jon",
-            ...user,
-          },
-          availableAgents,
-        },
+        meta,
       });
-
-      const assistantMessages = result.responseMessages.filter(
-        (m) => m.role === "assistant",
-      );
-      const responseText = assistantMessages.map((m) => m.content).join("\n");
-      const updatedMessages: ChatMessage[] = [...history, ...assistantMessages];
-
-      res.json({
-        response: responseText,
-        agent,
-        messages: updatedMessages,
-        usage: result.usage,
-        events: captured,
-      });
+      res.json(toJsonBody(result, history, agent, captured));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
+      const error = err instanceof Error ? err.message : String(err);
       console.error("Chat error:", err);
-      res.status(500).json({ error: message });
+      res.status(500).json({ error });
     } finally {
       appEvents.off(EventName.ToolProgress, onProgress);
       appEvents.off(EventName.Log, onLog);

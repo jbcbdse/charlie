@@ -11,6 +11,8 @@ import {
   ChatMessage,
   ChatExecutorInput,
   EventName,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
@@ -24,6 +26,7 @@ export class BedrockChatExecutor implements ChatExecutor {
   private toolPromptGenerator: ToolPromptGenerator;
   private messageConverter: MessageConverter;
   private toolsSupported: boolean;
+  private streamToolsUnsupported = false;
 
   constructor(options: {
     client?: BedrockRuntime;
@@ -123,25 +126,141 @@ export class BedrockChatExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const response = await this.client.converse(request);
+    if (this.streamToolsUnsupported && request.toolConfig) {
+      return this.executeNonStream(request, context, chatExecutorStartMs);
+    }
+    let stream;
+    try {
+      const response = await this.client.converseStream(request);
+      stream = response.stream;
+    } catch (err) {
+      if (request.toolConfig && this.isStreamToolsUnsupported(err)) {
+        this.streamToolsUnsupported = true;
+        return this.executeNonStream(request, context, chatExecutorStartMs);
+      }
+      throw err;
+    }
+    if (!stream) {
+      return new CharlieStreamConsumer(context, this).consume([]);
+    }
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(stream),
+    );
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: response,
+      response: { usage: result.usage },
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    const responseMessages = this.parseResponseContent(
-      response.output!.message!.content!,
+    return result;
+  }
+
+  private async executeNonStream(
+    request: ConverseCommandInput,
+    context: ChatExecutorInput["context"],
+    chatExecutorStartMs: number,
+  ): Promise<ChatAgentGetResponseOutput> {
+    const response = await this.client.converse(request);
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.converseToCharlieParts(response.output?.message?.content ?? []),
     );
-    return {
-      responseMessage: responseMessages[responseMessages.length - 1],
-      responseMessages,
-      usage: response.usage && {
-        inputTokens: response.usage.inputTokens || 0,
-        outputTokens: response.usage.outputTokens || 0,
-        totalTokens: response.usage.totalTokens || 0,
-      },
-    };
+    context.eventProducer.emit(EventName.ChatRawResponse, {
+      context,
+      response,
+      modelId: this.modelId,
+      timeMs: Date.now() - chatExecutorStartMs,
+    });
+    return result;
+  }
+
+  private converseToCharlieParts(
+    content: NonNullable<Message["content"]>,
+  ): CharlieStreamPart[] {
+    const parts: CharlieStreamPart[] = [];
+    content.forEach((contentBlock, index) => {
+      if (contentBlock.reasoningContent?.reasoningText?.text) {
+        parts.push({
+          type: "thinking",
+          text: contentBlock.reasoningContent.reasoningText.text,
+        });
+        return;
+      }
+      if (contentBlock.text) {
+        parts.push({ type: "text", text: contentBlock.text });
+        return;
+      }
+      if (contentBlock.toolUse) {
+        parts.push({
+          type: "tool_call",
+          index,
+          id: contentBlock.toolUse.toolUseId,
+          name: contentBlock.toolUse.name,
+          argumentsText: JSON.stringify(contentBlock.toolUse.input ?? {}),
+        });
+      }
+    });
+    return parts;
+  }
+
+  private async *toCharlieStream(
+    stream: AsyncIterable<{
+      contentBlockStart?: {
+        start?: {
+          toolUse?: { toolUseId?: string; name?: string };
+        };
+        contentBlockIndex?: number;
+      };
+      contentBlockDelta?: {
+        delta?: {
+          text?: string;
+          reasoningContent?: { text?: string; signature?: string };
+          toolUse?: { input?: string };
+        };
+        contentBlockIndex?: number;
+      };
+      metadata?: {
+        usage?: {
+          inputTokens?: number;
+          outputTokens?: number;
+          totalTokens?: number;
+        };
+      };
+    }>,
+  ): AsyncGenerator<CharlieStreamPart> {
+    for await (const part of stream) {
+      const start = part.contentBlockStart;
+      if (start?.start?.toolUse) {
+        yield {
+          type: "tool_call",
+          index: start.contentBlockIndex ?? 0,
+          id: start.start.toolUse.toolUseId || "",
+          name: start.start.toolUse.name || "",
+        };
+      }
+      const delta = part.contentBlockDelta?.delta;
+      const index = part.contentBlockDelta?.contentBlockIndex ?? 0;
+      if (delta?.text) {
+        yield { type: "text", text: delta.text };
+      }
+      if (delta?.reasoningContent?.text) {
+        yield { type: "thinking", text: delta.reasoningContent.text };
+      }
+      if (delta?.toolUse?.input) {
+        yield {
+          type: "tool_call",
+          index,
+          argumentsText: delta.toolUse.input,
+        };
+      }
+      if (part.metadata?.usage) {
+        yield {
+          type: "usage",
+          inputTokens: part.metadata.usage.inputTokens || 0,
+          outputTokens: part.metadata.usage.outputTokens || 0,
+          totalTokens: part.metadata.usage.totalTokens || 0,
+        };
+      }
+    }
   }
 
   private extractLeadingSystemMessages(
@@ -161,43 +280,20 @@ export class BedrockChatExecutor implements ChatExecutor {
     return [leadingSystemMessages, remainingMessages];
   }
 
-  private parseResponseContent(
-    content: NonNullable<Message["content"]>,
-  ): ChatMessage[] {
-    const response = content.map((contentBlock): ChatMessage => {
-      if (contentBlock.text) {
-        return {
-          role: "assistant" as const,
-          content: contentBlock.text,
-        };
-      }
-      if (contentBlock.toolUse) {
-        return {
-          role: "tool_call" as const,
-          toolCalls: [
-            {
-              function: {
-                name: contentBlock.toolUse!.name!,
-                arguments: contentBlock.toolUse.input as unknown as Record<
-                  string,
-                  unknown
-                >,
-              },
-              id: contentBlock.toolUse.toolUseId!,
-              type: "function",
-            },
-          ],
-        };
-      }
-      throw new Error(`Unknown content block: ${JSON.stringify(contentBlock)}`);
-    });
-    return response;
-  }
-
   /** Whether the `system` arg to the Converse API is supported by the model */
   private systemMessagesSupported(modelId: string): boolean {
     // this is not exhaustive,
     // this might need to be filled in later
     return !modelId.startsWith("amazon.titan");
+  }
+
+  private isStreamToolsUnsupported(err: unknown): boolean {
+    const name =
+      err && typeof err === "object" && "name" in err ? String(err.name) : "";
+    const message = err instanceof Error ? err.message : String(err);
+    return (
+      /doesn't support tool use in streaming mode/i.test(message) ||
+      (name === "ValidationException" && /streaming mode/i.test(message))
+    );
   }
 }

@@ -7,6 +7,8 @@ import {
   ChatExecutorInput,
   TemplateSerializer,
   EventName,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 
 export interface OpenAiChatExecutorOptions {
@@ -70,56 +72,90 @@ export class OpenAiChatExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const data = await this.openAiClient.chat.completions.create(request);
+    const stream = await this.openAiClient.chat.completions.create({
+      ...request,
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+    let lastChunk: unknown;
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(stream, (part) => {
+        lastChunk = part;
+      }),
+    );
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: data,
+      response: lastChunk,
       modelId: this.modelId,
       timeMs: Date.now() - chatExecutorStartMs,
     });
-    const responseMessage = data.choices[0].message;
-    const msg = this.responseToChatMessage(responseMessage);
-    return {
-      responseMessage: msg,
-      responseMessages: [msg],
-      usage: data.usage && {
-        inputTokens: data.usage.prompt_tokens,
-        outputTokens: data.usage.completion_tokens,
-        totalTokens: data.usage.total_tokens,
-      },
-    };
+    return result;
   }
 
-  /**
-   * When OpenAI responds, it does not include a text message with tool calls, only one or the other
-   * and it should always be an "assistant" message
-   */
-  private responseToChatMessage(
-    message: OpenAI.Chat.Completions.ChatCompletionMessage,
-  ): ChatMessage {
-    if (message.role !== "assistant") {
-      throw new Error(`Unexpected response message role: ${message.role}`);
-    }
-    if (message?.tool_calls && message.tool_calls?.length > 0) {
-      return {
-        role: "tool_call",
-        toolCalls: message.tool_calls
-          .filter((toolCall) => toolCall.type === "function")
-          .map((toolCall) => ({
-            function: {
-              name: toolCall.function.name,
-              arguments: JSON.parse(toolCall.function.arguments),
-            },
-            type: "function",
-            id: toolCall.id,
-          })),
+  private async *toCharlieStream(
+    stream: AsyncIterable<unknown>,
+    onPart: (part: unknown) => void,
+  ): AsyncGenerator<CharlieStreamPart> {
+    const toolIds = new Map<string, number>();
+    let nextIndex = 0;
+    for await (const raw of stream) {
+      onPart(raw);
+      const part = raw as {
+        usage?: {
+          prompt_tokens: number;
+          completion_tokens: number;
+          total_tokens: number;
+          completion_tokens_details?: { reasoning_tokens?: number };
+        };
+        choices?: {
+          delta?: {
+            content?: string | null;
+            reasoning_content?: string | null;
+            reasoning?: string | null;
+            tool_calls?: {
+              index?: number;
+              id?: string;
+              function?: { name?: string; arguments?: string };
+            }[];
+          };
+        }[];
       };
-    } else {
-      return {
-        role: "assistant",
-        content: message.content || "",
-        name: undefined,
-      };
+      if (part.usage) {
+        yield {
+          type: "usage",
+          inputTokens: part.usage.prompt_tokens,
+          outputTokens: part.usage.completion_tokens,
+          totalTokens: part.usage.total_tokens,
+          reasoningTokens:
+            part.usage.completion_tokens_details?.reasoning_tokens,
+        };
+      }
+      const delta = part.choices?.[0]?.delta;
+      if (!delta) continue;
+      if (delta.content) {
+        yield { type: "text", text: delta.content };
+      }
+      const thinking = delta.reasoning_content || delta.reasoning;
+      if (thinking) {
+        yield { type: "thinking", text: thinking };
+      }
+      for (const toolCall of delta.tool_calls ?? []) {
+        let index = toolCall.index;
+        if (index === undefined && toolCall.id && toolIds.has(toolCall.id)) {
+          index = toolIds.get(toolCall.id);
+        }
+        if (index === undefined) {
+          index = toolCall.id ? nextIndex++ : 0;
+        }
+        if (toolCall.id) toolIds.set(toolCall.id, index);
+        yield {
+          type: "tool_call",
+          index,
+          id: toolCall.id,
+          name: toolCall.function?.name,
+          argumentsText: toolCall.function?.arguments,
+        };
+      }
     }
   }
 

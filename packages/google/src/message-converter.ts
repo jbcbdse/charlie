@@ -12,7 +12,7 @@ export class MessageConverter {
   }
   private condense(contentObjects: Content[]): Content[] {
     return contentObjects.reduce((acc, content) => {
-      const last = acc.at(-1);
+      const last = acc[acc.length - 1];
       if (last?.role !== content.role) {
         acc.push(content);
       } else {
@@ -86,15 +86,22 @@ export class MessageConverter {
   }
 
   responseContentChatMessages(content: Content): ChatMessage[] {
-    return content.parts.map((part): ChatMessage => {
+    const messages: ChatMessage[] = [];
+    for (const part of content.parts ?? []) {
+      if ("thought" in part && part.thought) {
+        continue;
+      }
       if (part.text) {
-        return {
-          role: "assistant",
-          content: part.text,
-        };
+        const last = messages[messages.length - 1];
+        if (last?.role === "assistant") {
+          last.content += part.text;
+        } else {
+          messages.push({ role: "assistant", content: part.text });
+        }
+        continue;
       }
       if (part.functionCall) {
-        return {
+        messages.push({
           role: "tool_call",
           toolCalls: [
             {
@@ -107,10 +114,9 @@ export class MessageConverter {
               },
             },
           ],
-        };
+        });
       }
-      // no other part responses are expected or supported
-      throw new Error(`Unknown part type: ${JSON.stringify(part)}`);
-    });
+    }
+    return messages;
   }
 }

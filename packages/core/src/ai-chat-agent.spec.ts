@@ -1,6 +1,7 @@
 import { AiChatAgent } from "./ai-chat-agent";
 import { BaseTool } from "./base-tool";
 import {
+  ChatAgentContext,
   ChatAgentGetResponseInput,
   ChatAgentGetResponseOutput,
   ChatExecutor,
@@ -591,6 +592,223 @@ describe("AiChatAgent", () => {
       ]);
       // The second iteration should use the hijacked template.
       expect(executor.seen[1]).toBe("HIJACKED");
+    });
+  });
+
+  describe("ChatRun", () => {
+    class StreamingMockExecutor implements ChatExecutor {
+      modelId = "stream-model";
+      modelProvider = "stream-provider";
+      constructor(private slices: string[]) {}
+      async execute(
+        input: ChatExecutorInput,
+      ): Promise<ChatAgentGetResponseOutput> {
+        for (const text of this.slices) {
+          input.context.eventProducer.emit(EventName.ChatStreamChunk, {
+            context: input.context,
+            modelId: this.modelId,
+            modelProvider: this.modelProvider,
+            chunk: { type: "text", text },
+          });
+        }
+        const responseMessage: ChatMessage = {
+          role: "assistant",
+          content: this.slices.join(""),
+        };
+        return {
+          responseMessage,
+          responseMessages: [responseMessage],
+        };
+      }
+    }
+
+    class ProgressTool extends BaseTool {
+      public name = "ProgressTool";
+      public description = "Emits progress";
+      public schema = z.object({});
+      public returnDirect = true;
+      public handler(
+        _params: z.TypeOf<typeof this.schema>,
+        context: ChatAgentContext,
+      ): string {
+        context.eventProducer.emit(EventName.ToolProgress, {
+          context,
+          message: "working",
+        });
+        context.eventProducer.emit(EventName.Log, {
+          context,
+          message: "logged",
+          level: "info",
+          meta: {},
+        });
+        return "ok";
+      }
+    }
+
+    class ProgressMockExecutor implements ChatExecutor {
+      modelId = "progress-model";
+      modelProvider = "progress-provider";
+      async execute(): Promise<ChatAgentGetResponseOutput> {
+        const responseMessage: ChatMessage = {
+          role: "tool_call",
+          toolCalls: [
+            {
+              function: { name: "ProgressTool", arguments: {} },
+              id: "progress-1",
+              type: "function",
+            },
+          ],
+        };
+        return {
+          responseMessage,
+          responseMessages: [responseMessage],
+        };
+      }
+    }
+
+    it("is thenable and returns the same result as await", async () => {
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["Hel", "lo"]),
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      expect(typeof run.then).toBe("function");
+      const result = await run;
+      expect(result.responseMessage).toEqual({
+        role: "assistant",
+        content: "Hello",
+      });
+    });
+
+    it("scopes .on listeners to the runId", async () => {
+      const producer = new EventProducer();
+      const runA = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["A1", "A2"]),
+        eventProducer: producer,
+      }).getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "a" }],
+      });
+      const runB = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["B1"]),
+        eventProducer: producer,
+      }).getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "b" }],
+      });
+      const heardA: string[] = [];
+      const heardB: string[] = [];
+      runA.on(EventName.ChatStreamChunk, ({ chunk }) => {
+        if (chunk.type === "text") heardA.push(chunk.text);
+      });
+      runB.on(EventName.ChatStreamChunk, ({ chunk }) => {
+        if (chunk.type === "text") heardB.push(chunk.text);
+      });
+      await Promise.all([runA, runB]);
+      expect(heardA).toEqual(["A1", "A2"]);
+      expect(heardB).toEqual(["B1"]);
+    });
+
+    it("async-iterates chunks then stops", async () => {
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["one", "two"]),
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      const texts: string[] = [];
+      for await (const { chunk } of run) {
+        if (chunk.type === "text") texts.push(chunk.text);
+      }
+      expect(texts).toEqual(["one", "two"]);
+      const result = await run;
+      expect((result.responseMessage as MessageAssistant).content).toBe(
+        "onetwo",
+      );
+    });
+
+    it("does not reject the run when a listener throws", async () => {
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["ok"]),
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      run.on(EventName.ChatStreamChunk, () => {
+        throw new Error("consumer fault");
+      });
+      await expect(run).resolves.toMatchObject({
+        responseMessage: { role: "assistant", content: "ok" },
+      });
+    });
+
+    it("replaces a duplicate .on registration instead of leaking", async () => {
+      const producer = new EventProducer();
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["x"]),
+        eventProducer: producer,
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      const heard: string[] = [];
+      const listener = (): void => {
+        heard.push("hit");
+      };
+      run.on(EventName.ChatStreamChunk, listener);
+      run.on(EventName.ChatStreamChunk, listener);
+      await run;
+      expect(heard).toEqual(["hit"]);
+      expect(producer.emitter.listenerCount(EventName.ChatStreamChunk)).toBe(0);
+    });
+
+    it("ignores .on after the run settles", async () => {
+      const producer = new EventProducer();
+      const localAgent = new AiChatAgent({
+        chatExecutor: new StreamingMockExecutor(["ok"]),
+        eventProducer: producer,
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "hi" }],
+      });
+      await run;
+      run.on(EventName.ChatStreamChunk, () => undefined);
+      expect(producer.emitter.listenerCount(EventName.ChatStreamChunk)).toBe(0);
+    });
+
+    it("stamps toolName and toolCallId on ToolProgress and Log", async () => {
+      const producer = new EventProducer();
+      const localAgent = new AiChatAgent({
+        chatExecutor: new ProgressMockExecutor(),
+        eventProducer: producer,
+      });
+      const run = localAgent.getResponse({
+        meta: {},
+        messages: [{ role: "user", content: "go" }],
+        tools: [new ProgressTool()],
+      });
+      const progress: EventTypeMap[EventName.ToolProgress][] = [];
+      const logs: EventTypeMap[EventName.Log][] = [];
+      run.on(EventName.ToolProgress, (event) => {
+        progress.push(event);
+      });
+      run.on(EventName.Log, (event) => {
+        logs.push(event);
+      });
+      await run;
+      expect(progress).toHaveLength(1);
+      expect(progress[0].message).toBe("working");
+      expect(progress[0].toolName).toBe("ProgressTool");
+      expect(progress[0].toolCallId).toBe("progress-1");
+      expect(logs).toHaveLength(1);
+      expect(logs[0].toolName).toBe("ProgressTool");
+      expect(logs[0].toolCallId).toBe("progress-1");
     });
   });
 });

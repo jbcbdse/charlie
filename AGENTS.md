@@ -34,9 +34,39 @@ Executors must emit two events (see below): `ChatExecutorStart` before the call 
 
 **`AiChatAgent`** is stateless. It receives `messages` (the full history), calls the executor, runs tool calls in a loop until there are no more, then returns. The caller is responsible for appending returned messages to its own history before the next turn.
 
+`getResponse` is not `async`. It returns a thenable **`ChatRun`** (`Promise` plus `.on` / `.off` and an async iterator). `await agent.getResponse(...)` still waits for the whole turn, including tool loops. Attach listeners synchronously after `getResponse` returns — the loop starts on `queueMicrotask`. `ChatRun.on` filters by `context.runId`.
+
+```typescript
+const { responseMessages } = await agent.getResponse({ messages, tools });
+```
+
+```typescript
+const run = agent.getResponse({ messages, tools, meta });
+
+run.on(EventName.ChatStreamChunk, ({ chunk }) => {
+  if (chunk.type === "text") process.stdout.write(chunk.text);
+  if (chunk.type === "thinking") process.stderr.write(chunk.text);
+});
+run.on(EventName.ToolProgress, ({ message, toolName }) => {
+  console.log(`[progress] ${toolName}: ${message}`);
+});
+
+const { responseMessages } = await run;
+```
+
+```typescript
+const run = agent.getResponse({ messages, tools });
+for await (const { chunk } of run) {
+  if (chunk.type === "text") process.stdout.write(chunk.text);
+}
+const result = await run;
+```
+
+Executors always use the provider stream API and map vendor parts into a common `CharlieStreamPart` stream (`text`, `thinking`, `tool_call`, `reasoning`, `usage`, `error`). `CharlieStreamConsumer` in core emits `chat:stream:chunk` and folds parts into `responseMessages`. Thinking tokens are never concatenated into `MessageAssistant.content`. Yield `reasoning` when the provider needs a round-trip (OpenAI Responses encrypted reasoning, Anthropic thinking signatures). Completions-style `reasoning_content` stays `thinking` (stream-only). On `tool_call` parts, `id` and `name` are last-wins; `argumentsText` is append-only.
+
 **Tools** extend `BaseTool` with a Zod schema and an async `handler`. Setting `returnDirect = true` on a tool causes the agent to stop the loop and return the tool result directly without re-entering the LLM — useful for side-effect tools like account deletion.
 
-**Events** use a singleton `eventProducer` (from `core`). Executors call `this.eventProducer.emit(EventName.X, ...)`. Consumers subscribe via `events.on(EventName.X, handler)` or the typed `EventSubscriber` class. The `datadog` package is implemented entirely as an event subscriber — it never touches the executor.
+**Events** use a singleton `eventProducer` (from `core`). Executors call `this.eventProducer.emit(EventName.X, ...)`. Consumers subscribe via `events.on(EventName.X, handler)`, the typed `EventSubscriber` class, or `ChatRun.on` (run-scoped). The `datadog` package is implemented entirely as an event subscriber — it never touches the executor. Stream chunks use the same bus; a global subscriber must still filter by `requestId` / `runId`.
 
 **Template system**: the system prompt is a string with `{{key}}` placeholders. At runtime, `meta` passed to `getResponse` is serialized (YAML by default) and substituted in. This is how user context, available agent names, etc. reach the prompt without hardcoding.
 

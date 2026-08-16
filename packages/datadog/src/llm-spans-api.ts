@@ -45,6 +45,7 @@ interface Metrics {
   input_tokens?: number;
   output_tokens?: number;
   total_tokens?: number;
+  reasoning_output_tokens?: number;
   time_to_first_token?: number;
   time_per_output_token?: number;
 }
@@ -261,6 +262,7 @@ export class LlmSpansApi {
         input_tokens: event.usage?.inputTokens,
         output_tokens: event.usage?.outputTokens,
         total_tokens: event.usage?.totalTokens,
+        reasoning_output_tokens: event.usage?.reasoningTokens,
       },
     };
     runData.spans.push(span);

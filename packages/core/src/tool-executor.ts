@@ -35,7 +35,10 @@ export class ToolExecutor {
           toolCallId: toolCall.id,
         });
         const toolMessage = await tool
-          .handle(toolCall.function.arguments, context)
+          .handle(
+            toolCall.function.arguments,
+            this.withTool(context, tool.name, toolCall.id),
+          )
           .then((toolResult) => ({
             role: "tool" as const,
             content: toolResult,
@@ -64,5 +67,25 @@ export class ToolExecutor {
       }),
     );
     return toolMessages;
+  }
+
+  /**
+   * Tools emit progress and logs without naming themselves. Overlay the current
+   * call's identity so `emit` can stamp `toolName` / `toolCallId` for subscribers.
+   * A Proxy keeps the same context object (tools mutate it; calls run in parallel)
+   * instead of a copy that would drop those writes.
+   */
+  private withTool(
+    context: ChatAgentContext,
+    toolName: string,
+    toolCallId: string,
+  ): ChatAgentContext {
+    return new Proxy(context, {
+      get(target, prop, receiver) {
+        if (prop === "toolName") return toolName;
+        if (prop === "toolCallId") return toolCallId;
+        return Reflect.get(target, prop, receiver);
+      },
+    });
   }
 }

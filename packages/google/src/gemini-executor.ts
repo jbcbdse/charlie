@@ -3,6 +3,8 @@ import {
   ChatExecutorInput,
   EventName,
   ChatAgentGetResponseOutput,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 import {
   GenerateContentRequest,
@@ -47,28 +49,77 @@ export class GeminiExecutor implements ChatExecutor {
       modelId: this.modelId,
       request: req,
     });
-    const response = await this.model.generateContent(req);
+    const streamed = await this.model.generateContentStream(req);
+    let aggregated: unknown;
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(streamed, (response) => {
+        aggregated = response;
+      }),
+    );
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
       modelId: this.modelId,
-      response,
+      response: aggregated,
       timeMs: Date.now() - startMs,
     });
-    const responseMessages = this.messageConverter.responseContentChatMessages(
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      response.response.candidates![0].content,
-    );
-    return {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      responseMessage: responseMessages.at(-1)!,
-      responseMessages,
-      usage: response.response.usageMetadata && {
-        inputTokens:
-          (response.response.usageMetadata.promptTokenCount || 0) +
-          (response.response.usageMetadata.cachedContentTokenCount || 0),
-        outputTokens: response.response.usageMetadata.candidatesTokenCount,
-        totalTokens: response.response.usageMetadata.totalTokenCount,
-      },
+    return result;
+  }
+
+  private async *toCharlieStream(
+    streamed: {
+      stream: AsyncIterable<unknown>;
+      response: Promise<unknown>;
+    },
+    onAggregated: (response: unknown) => void,
+  ): AsyncGenerator<CharlieStreamPart> {
+    let toolIndex = 0;
+    for await (const raw of streamed.stream) {
+      const chunk = raw as {
+        candidates?: { content?: { parts?: unknown[] } }[];
+      };
+      const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+      for (const part of parts as {
+        thought?: boolean;
+        text?: string;
+        functionCall?: { name: string; args?: Record<string, unknown> };
+      }[]) {
+        if (part.thought && part.text) {
+          yield { type: "thinking", text: part.text };
+          continue;
+        }
+        if (part.text) {
+          yield { type: "text", text: part.text };
+        }
+        if (part.functionCall) {
+          yield {
+            type: "tool_call",
+            index: toolIndex++,
+            name: part.functionCall.name,
+            argumentsText: JSON.stringify(part.functionCall.args ?? {}),
+          };
+        }
+      }
+    }
+    const aggregated = (await streamed.response) as {
+      usageMetadata?: {
+        promptTokenCount?: number;
+        cachedContentTokenCount?: number;
+        candidatesTokenCount?: number;
+        thoughtsTokenCount?: number;
+        totalTokenCount?: number;
+      };
     };
+    onAggregated(aggregated);
+    if (aggregated.usageMetadata) {
+      yield {
+        type: "usage",
+        inputTokens:
+          (aggregated.usageMetadata.promptTokenCount || 0) +
+          (aggregated.usageMetadata.cachedContentTokenCount || 0),
+        outputTokens: aggregated.usageMetadata.candidatesTokenCount || 0,
+        totalTokens: aggregated.usageMetadata.totalTokenCount || 0,
+        reasoningTokens: aggregated.usageMetadata.thoughtsTokenCount,
+      };
+    }
   }
 }

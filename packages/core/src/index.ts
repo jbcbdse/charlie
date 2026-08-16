@@ -18,10 +18,20 @@ export {
   MessageTool,
   MessageToolCall,
   MessageUser,
+  ChatRun,
+  TokenUsage,
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,
 } from "./types";
+export { ChatRunGenerator } from "./chat-run";
+export {
+  CharlieStreamConsumer,
+  CharlieStreamPart,
+  CharlieReasoningPart,
+  CharlieUsagePart,
+  CharlieErrorPart,
+} from "./charlie-stream";
 export { events, EventSubscriber } from "./event-subscriber";
 export {
   EventName,
@@ -31,8 +41,10 @@ export {
   EventChatEnd,
   EventChatStart,
   EventChatExecutorEnd,
+  EventChatStreamChunk,
   EventToolEnd,
   EventToolProgress,
   EventLog,
   LogLevel,
+  StreamChunk,
 } from "./event-producer";

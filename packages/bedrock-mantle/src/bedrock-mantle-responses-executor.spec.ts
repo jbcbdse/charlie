@@ -59,11 +59,44 @@ describe("BedrockMantleMessagesExecutor", () => {
 
   it("calls Messages API and maps thinking plus text", async () => {
     const create = jest.fn().mockResolvedValue({
-      content: [
-        { type: "thinking", thinking: "hmm", signature: "sig" },
-        { type: "text", text: "hello" },
-      ],
-      usage: { input_tokens: 2, output_tokens: 3 },
+      async *[Symbol.asyncIterator]() {
+        yield {
+          type: "message_start",
+          message: { usage: { input_tokens: 2 } },
+        };
+        yield {
+          type: "content_block_start",
+          index: 0,
+          content_block: { type: "thinking", thinking: "" },
+        };
+        yield {
+          type: "content_block_delta",
+          index: 0,
+          delta: { type: "thinking_delta", thinking: "hmm" },
+        };
+        yield {
+          type: "content_block_delta",
+          index: 0,
+          delta: { type: "signature_delta", signature: "sig" },
+        };
+        yield {
+          type: "content_block_start",
+          index: 1,
+          content_block: { type: "text", text: "" },
+        };
+        yield {
+          type: "content_block_delta",
+          index: 1,
+          delta: { type: "text_delta", text: "hello" },
+        };
+        yield {
+          type: "message_delta",
+          usage: {
+            output_tokens: 3,
+            output_tokens_details: { thinking_tokens: 1 },
+          },
+        };
+      },
     });
     const executor = new BedrockMantleMessagesExecutor({
       anthropicClient: { messages: { create } } as never,
@@ -85,6 +118,7 @@ describe("BedrockMantleMessagesExecutor", () => {
         max_tokens: 8192,
         system: "be nice",
         messages: [{ role: "user", content: "hi" }],
+        stream: true,
       }),
     );
     expect(result.responseMessages).toEqual([
@@ -99,6 +133,7 @@ describe("BedrockMantleMessagesExecutor", () => {
       inputTokens: 2,
       outputTokens: 3,
       totalTokens: 5,
+      reasoningTokens: 1,
     });
   });
 });

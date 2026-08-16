@@ -8,6 +8,11 @@ These types should be suitable for storing history with a clear idea of what hap
 
 import type { ITool } from "./base-tool";
 import type { EventProducer } from "./event-producer";
+import type {
+  EventName,
+  EventTypeMap,
+  EventChatStreamChunk,
+} from "./event-producer";
 
 /**
  * A system message in the chat
@@ -120,6 +125,10 @@ export interface ChatAgentContext {
   messages: ChatMessage[];
   meta: ChatAgentContentMeta;
   eventProducer: EventProducer;
+  /** Set by ToolExecutor for the duration of handle(). */
+  toolName?: string;
+  /** Set by ToolExecutor for the duration of handle(). */
+  toolCallId?: string;
   /**
    * The system prompt template that can be mutated by tools to affect
    * subsequent loop iterations. The agent serializes this template on every
@@ -139,19 +148,31 @@ export interface ChatAgentGetResponseInput {
   systemPrompt?: string;
   meta?: ChatAgentContentMeta;
 }
+/** Token counts from one executor call. `reasoningTokens` is a breakdown when the provider reports it. */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  reasoningTokens?: number;
+}
 export interface ChatAgentGetResponseOutput {
   responseMessage: ChatMessage;
   responseMessages: ChatMessage[];
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-    totalTokens: number;
-  };
+  usage?: TokenUsage;
 }
+export type ChatRun = Promise<ChatAgentGetResponseOutput> & {
+  on<T extends EventName>(
+    eventName: T,
+    listener: (event: EventTypeMap[T], eventName: T) => void,
+  ): void;
+  off<T extends EventName>(
+    eventName: T,
+    listener: (event: EventTypeMap[T], eventName: T) => void,
+  ): void;
+  [Symbol.asyncIterator](): AsyncIterableIterator<EventChatStreamChunk>;
+};
 export interface ChatAgent {
-  getResponse(
-    input: ChatAgentGetResponseInput,
-  ): Promise<ChatAgentGetResponseOutput>;
+  getResponse(input: ChatAgentGetResponseInput): ChatRun;
 }
 export interface ChatExecutorInput {
   messages: ChatMessage[];

@@ -1,9 +1,12 @@
 import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
+import type { ContentBlock } from "@anthropic-ai/sdk/resources/messages";
 import {
   ChatAgentGetResponseOutput,
   ChatExecutor,
   ChatExecutorInput,
   EventName,
+  CharlieStreamConsumer,
+  CharlieStreamPart,
 } from "@jbcbdse/charlie-core";
 import { MantleMessagesConverter } from "./messages-converter";
 import {
@@ -12,6 +15,24 @@ import {
   resolveMantleProfile,
   resolveMantleRegion,
 } from "./mantle-options";
+
+type AnthropicBlock<T extends ContentBlock["type"]> = Extract<
+  ContentBlock,
+  { type: T }
+>;
+
+/** Anthropic Messages {@link ContentBlock} as assembled from stream events. */
+interface AnthropicContentBlock {
+  type: ContentBlock["type"];
+  text?: AnthropicBlock<"text">["text"];
+  thinking?: AnthropicBlock<"thinking">["thinking"];
+  signature?: AnthropicBlock<"thinking">["signature"];
+  id?: AnthropicBlock<"tool_use">["id"];
+  name?: AnthropicBlock<"tool_use">["name"];
+  input?: AnthropicBlock<"tool_use">["input"];
+  data?: AnthropicBlock<"redacted_thinking">["data"];
+  inputJson?: string;
+}
 
 export type BedrockMantleMessagesExecutorOptions = MantleAuthOptions & {
   modelProvider?: string;
@@ -79,32 +100,101 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
       request,
       modelId: this.modelId,
     });
-    const data = await this.client.messages.create(request);
+    const stream = await this.client.messages.create({
+      ...request,
+      stream: true,
+    });
+    const result = await new CharlieStreamConsumer(context, this).consume(
+      this.toCharlieStream(stream),
+    );
     context.eventProducer.emit(EventName.ChatRawResponse, {
       context,
-      response: data,
+      response: { usage: result.usage },
       modelId: this.modelId,
       timeMs: Date.now() - startMs,
     });
-    const responseMessages = this.messageConverter.fromResponse(data.content);
-    const responseMessage = [...responseMessages]
-      .reverse()
-      .find((m) => m.role !== "reasoning") ??
-      responseMessages[responseMessages.length - 1] ?? {
-        role: "assistant" as const,
-        content: "",
+    return result;
+  }
+
+  private async *toCharlieStream(
+    stream: AsyncIterable<unknown>,
+  ): AsyncGenerator<CharlieStreamPart> {
+    const thinking: string[] = [];
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let reasoningTokens: number | undefined;
+    for await (const raw of stream) {
+      const part = raw as {
+        type: string;
+        index?: number;
+        message?: { usage?: { input_tokens?: number } };
+        content_block?: AnthropicContentBlock;
+        delta?: {
+          type: string;
+          text?: string;
+          thinking?: string;
+          signature?: string;
+          partial_json?: string;
+        };
+        usage?: {
+          output_tokens?: number;
+          output_tokens_details?: { thinking_tokens?: number | null };
+        };
       };
-    return {
-      responseMessage,
-      responseMessages:
-        responseMessages.length > 0
-          ? responseMessages
-          : [{ role: "assistant", content: "" }],
-      usage: data.usage && {
-        inputTokens: data.usage.input_tokens,
-        outputTokens: data.usage.output_tokens,
-        totalTokens: data.usage.input_tokens + data.usage.output_tokens,
-      },
+      if (part.type === "message_start") {
+        inputTokens = part.message?.usage?.input_tokens ?? inputTokens;
+      }
+      if (part.type === "content_block_start") {
+        const block = part.content_block;
+        if (block?.type === "tool_use") {
+          yield {
+            type: "tool_call",
+            index: part.index ?? 0,
+            id: block.id,
+            name: block.name,
+          };
+        }
+        if (block?.type === "redacted_thinking" && block.data) {
+          yield { type: "reasoning", signature: block.data };
+        }
+      }
+      if (part.type === "content_block_delta") {
+        const index = part.index ?? 0;
+        const delta = part.delta;
+        if (delta?.type === "text_delta" && delta.text) {
+          yield { type: "text", text: delta.text };
+        }
+        if (delta?.type === "thinking_delta" && delta.thinking) {
+          thinking[index] = (thinking[index] ?? "") + delta.thinking;
+          yield { type: "thinking", text: delta.thinking };
+        }
+        if (delta?.type === "signature_delta" && delta.signature) {
+          yield {
+            type: "reasoning",
+            content: thinking[index],
+            signature: delta.signature,
+          };
+        }
+        if (delta?.type === "input_json_delta" && delta.partial_json) {
+          yield {
+            type: "tool_call",
+            index,
+            argumentsText: delta.partial_json,
+          };
+        }
+      }
+      if (part.type === "message_delta") {
+        outputTokens = part.usage?.output_tokens ?? outputTokens;
+        reasoningTokens =
+          part.usage?.output_tokens_details?.thinking_tokens ?? reasoningTokens;
+      }
+    }
+    yield {
+      type: "usage",
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
+      reasoningTokens,
     };
   }
 }

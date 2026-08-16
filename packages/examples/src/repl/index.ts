@@ -47,7 +47,6 @@ appEvents.on(EventName.ToolsEnd, (data) => {
   });
 });
 appEvents.on(EventName.ChatEnd, (data) => {
-  console.dir(data.messages, { depth: null });
   console.log(data.modelId, "complete");
 });
 appEvents.on(EventName.ToolProgress, (data) => {
@@ -267,8 +266,8 @@ async function handleChat(input: string): Promise<string> {
     content: input,
   };
   messageHistory.push(userMessage);
-  const response = await agents[currentAgent]
-    .getResponse({
+  try {
+    const run = agents[currentAgent].getResponse({
       messages: messageHistory,
       tools: tools,
       meta: {
@@ -279,31 +278,24 @@ async function handleChat(input: string): Promise<string> {
         },
         availableAgents,
       },
-    })
-    .catch((err) => {
-      console.error(err, err?.response?.data);
-      return {
-        responseMessage: {
-          role: "assistant" as const,
-          content: "An error occurred",
-        },
-        responseMessages: [
-          {
-            role: "assistant" as const,
-            content: "An error occurred",
-          },
-        ],
-      };
     });
-  const outputString = response.responseMessages
-    .filter((msg) => msg.role === "assistant")
-    .map((msg) => msg.content)
-    .join("\n");
-  // only remember assistant messages for history
-  messageHistory.push(
-    ...response.responseMessages.filter((msg) => msg.role === "assistant"),
-  );
-  return outputString;
+    run.on(EventName.ChatStreamChunk, ({ chunk }) => {
+      if (chunk.type === "text") {
+        process.stdout.write(chunk.text);
+      }
+      if (chunk.type === "thinking") {
+        process.stderr.write(chunk.text);
+      }
+    });
+    const response = await run;
+    process.stdout.write("\n");
+    messageHistory.push(...response.responseMessages);
+    return "";
+  } catch (err) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.error(err, (err as any)?.response?.data);
+    return "An error occurred";
+  }
 }
 
 function handleUse(cmd: string): string | null {
