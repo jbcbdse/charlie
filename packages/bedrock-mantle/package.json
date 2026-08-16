@@ -1,6 +1,6 @@
 {
   "name": "@jbcbdse/charlie-bedrock-mantle",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "",
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
     "@anthropic-ai/bedrock-sdk": "^0.32.4",
     "@anthropic-ai/sdk": "^0.117.1",
     "@aws/bedrock-token-generator": "^1.1.0",
-    "@jbcbdse/charlie-core": "^0.4.0",
-    "@jbcbdse/charlie-openai": "^0.4.0"
+    "@jbcbdse/charlie-core": "^0.5.0",
+    "@jbcbdse/charlie-openai": "^0.5.0"
   }
 }

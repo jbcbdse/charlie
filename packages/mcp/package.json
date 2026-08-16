@@ -1,6 +1,6 @@
 {
   "name": "@jbcbdse/charlie-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "MCP client adapter for Charlie: tools as ITool, plus caller APIs for resources and prompts",
   "repository": {
     "type": "git",
@@ -25,7 +25,7 @@
   "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
-    "@jbcbdse/charlie-core": "^0.4.0",
+    "@jbcbdse/charlie-core": "^0.5.0",
     "@modelcontextprotocol/client": "^2.0.0"
   },
   "devDependencies": {
