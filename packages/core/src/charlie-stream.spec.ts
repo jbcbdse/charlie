@@ -8,6 +8,7 @@ function context(producer: EventProducer): ChatAgentContext {
     modelId: "test-model",
     messages: [],
     tools: [],
+    mustCallTool: false,
     meta: {},
     eventProducer: producer,
   };

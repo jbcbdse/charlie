@@ -2,7 +2,6 @@ import { AiChatAgent } from "./ai-chat-agent";
 import { BaseTool } from "./base-tool";
 import {
   ChatAgentContext,
-  ChatAgentGetResponseInput,
   ChatAgentGetResponseOutput,
   ChatExecutor,
   ChatExecutorInput,
@@ -54,7 +53,7 @@ class MockExecutor implements ChatExecutor {
   modelId = "mock-model-id";
   modelProvider = "mock-model-provider";
   execute = jest.fn(function (
-    input: ChatAgentGetResponseInput,
+    input: ChatExecutorInput,
   ): Promise<ChatAgentGetResponseOutput> {
     const message = input.messages[input.messages.length - 1];
     let responseMessage: ChatMessage = { role: "assistant", content: "Hello" };
@@ -280,6 +279,113 @@ describe("AiChatAgent", () => {
       expect(inputTools).toHaveLength(1);
       expect(inputMessages).toEqual([
         { role: "user", content: "Calculate 3 + 4" },
+      ]);
+    });
+    it("passes { type: required } when mustCallTool is set", async () => {
+      const capturing = chatExecutor as MockExecutor;
+      await agent.getResponse({
+        messages: [{ role: "user", content: "Hey buddy" }],
+        tools: [new CalculatorTool()],
+        mustCallTool: true,
+      });
+      expect(capturing.execute.mock.calls[0][0].toolChoice).toEqual({
+        type: "required",
+      });
+    });
+    it("passes { type: tool, name } when requiredToolName is set", async () => {
+      const capturing = chatExecutor as MockExecutor;
+      await agent.getResponse({
+        messages: [{ role: "user", content: "Hey buddy" }],
+        tools: [new CalculatorTool(), new PingPongTool()],
+        requiredToolName: "CalculatorTool",
+      });
+      expect(capturing.execute.mock.calls[0][0].toolChoice).toEqual({
+        type: "tool",
+        name: "CalculatorTool",
+      });
+    });
+    it("lets requiredToolName win over mustCallTool", async () => {
+      const capturing = chatExecutor as MockExecutor;
+      await agent.getResponse({
+        messages: [{ role: "user", content: "Hey buddy" }],
+        tools: [new CalculatorTool(), new PingPongTool()],
+        mustCallTool: true,
+        requiredToolName: "PingPongTool",
+      });
+      expect(capturing.execute.mock.calls[0][0].toolChoice).toEqual({
+        type: "tool",
+        name: "PingPongTool",
+      });
+    });
+    it("throws when requiredToolName is not in context.tools", async () => {
+      await expect(
+        agent.getResponse({
+          messages: [{ role: "user", content: "Hey buddy" }],
+          tools: [new CalculatorTool()],
+          requiredToolName: "missing",
+        }),
+      ).rejects.toThrow('Required tool "missing" is not in context.tools');
+    });
+    it("throws when mustCallTool is set with no tools", async () => {
+      await expect(
+        agent.getResponse({
+          messages: [{ role: "user", content: "Hey buddy" }],
+          mustCallTool: true,
+        }),
+      ).rejects.toThrow("mustCallTool is set but no tools are available");
+    });
+    it("uses context.requiredToolName set by a postToolCall transformer on the next execute", async () => {
+      const seen: ChatExecutorInput["toolChoice"][] = [];
+      const executor: ChatExecutor = {
+        modelId: "mock-model-id",
+        modelProvider: "mock-model-provider",
+        execute: jest.fn(async (input: ChatExecutorInput) => {
+          seen.push(input.toolChoice);
+          const last = input.messages[input.messages.length - 1];
+          if (last.role === "user") {
+            const responseMessage: ChatMessage = {
+              role: "tool_call",
+              toolCalls: [
+                {
+                  id: "toolcall1",
+                  type: "function",
+                  function: {
+                    name: "CalculatorTool",
+                    arguments: { expr: "3 + 4" },
+                  },
+                },
+              ],
+            };
+            return {
+              responseMessage,
+              responseMessages: [responseMessage],
+            };
+          }
+          const responseMessage: ChatMessage = {
+            role: "assistant",
+            content: "done",
+          };
+          return { responseMessage, responseMessages: [responseMessage] };
+        }),
+      };
+      const localAgent = new AiChatAgent({
+        chatExecutor: executor,
+        postToolCallTransformers: [
+          {
+            transform(messages, context) {
+              context.requiredToolName = "CalculatorTool";
+              return messages;
+            },
+          },
+        ],
+      });
+      await localAgent.getResponse({
+        messages: [{ role: "user", content: "Calculate 3 + 4" }],
+        tools: [new CalculatorTool()],
+      });
+      expect(seen).toEqual([
+        undefined,
+        { type: "tool", name: "CalculatorTool" },
       ]);
     });
   });

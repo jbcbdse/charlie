@@ -67,6 +67,8 @@ Executors always use the provider stream API and map vendor parts into a common 
 
 **Tools** extend `BaseTool` with a Zod schema and an async `handler`. Setting `returnDirect = true` on a tool causes the agent to stop the loop and return the tool result directly without re-entering the LLM — useful for side-effect tools like account deletion.
 
+**Tool choice**: pass `mustCallTool` / `requiredToolName` on `getResponse` (copied onto mutable `context`). `mustCallTool` forces at least one tool call (`required` / Anthropic `any` / Gemini `ANY`). `requiredToolName` forces that one named tool and wins over `mustCallTool`. Change either flag on context from preRun / postToolCall / a tool handler — do not put `required` on `ITool`. Bedrock `toolsSupported: false` cannot force a call (inline prompt path has no API `toolChoice`).
+
 **preRunTransformers** run once before the first executor call. They return the messages to send and may replace `context.tools` (a mutable copy of the `getResponse` tools). Use this to filter a large tool list or rewrite incoming messages without wrapping every `getResponse` call. `preToolCallTransformers` / `postToolCallTransformers` / `postRunTransformers` still process LLM output around tool execution.
 
 **MCP** (`@jbcbdse/charlie-mcp`) is a client adapter, not an executor. `McpSessions.connect` talks to stdio or Streamable HTTP servers. MCP tools become `ITool[]` for `getResponse`. Resources (`listResources` / `readResource`) and prompts (`listPrompts` / `getPrompt` → `ChatMessage[]`) are caller APIs — `AiChatAgent` never sees them. The REPL/server load servers from `MCP_CONFIG` if set.
@@ -104,7 +106,7 @@ E2e tests (require live API keys in `.env`):
 
 ```bash
 cd packages/examples
-npx jest --config tsconfig.test.json
+npm run test:e2e
 ```
 
 The e2e suite starts the HTTP server as a subprocess, runs tests against it, then tears it down. It uses an LLM judge (calling Claude via Bedrock) to evaluate open-ended responses. See `packages/examples/AGENTS.md` for the agent/model lineup.

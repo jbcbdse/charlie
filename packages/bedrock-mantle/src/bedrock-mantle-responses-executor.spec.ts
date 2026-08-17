@@ -108,6 +108,7 @@ describe("BedrockMantleMessagesExecutor", () => {
         modelId: "anthropic.claude-haiku-4-5",
         messages: [],
         tools: [],
+        mustCallTool: false,
         meta: {},
         eventProducer: { emit: jest.fn() },
         systemPrompt: "be nice",

@@ -7,6 +7,7 @@ import {
   EventName,
   CharlieStreamConsumer,
   CharlieStreamPart,
+  ToolChoice,
 } from "@jbcbdse/charlie-core";
 import { MantleMessagesConverter } from "./messages-converter";
 import {
@@ -78,6 +79,7 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
     messages,
     tools,
     context,
+    toolChoice,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const request = {
       model: this.modelId,
@@ -93,6 +95,9 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
           type: "object" as const,
         },
       })),
+      tool_choice: tools?.length
+        ? this.toAnthropicToolChoice(toolChoice)
+        : undefined,
     };
     const startMs = Date.now();
     context.eventProducer.emit(EventName.ChatRawRequest, {
@@ -114,6 +119,14 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
       timeMs: Date.now() - startMs,
     });
     return result;
+  }
+
+  private toAnthropicToolChoice(
+    toolChoice?: ToolChoice,
+  ): { type: "any" } | { type: "tool"; name: string } | undefined {
+    if (!toolChoice) return undefined;
+    if (toolChoice.type === "required") return { type: "any" };
+    return { type: "tool", name: toolChoice.name };
   }
 
   private async *toCharlieStream(

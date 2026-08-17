@@ -7,6 +7,7 @@ import {
   EventName,
   CharlieStreamConsumer,
   CharlieStreamPart,
+  ToolChoice,
 } from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutorOptions } from "./openai-chat-executor";
 
@@ -39,6 +40,7 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
     messages,
     tools,
     context,
+    toolChoice,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const request: OpenAI.Responses.ResponseCreateParamsStreaming = {
       model: this.options.modelId,
@@ -56,6 +58,9 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
           parameters: tool.jsonSchema,
           strict: false,
         })),
+      tool_choice: tools?.length
+        ? this.toResponsesToolChoice(toolChoice)
+        : undefined,
       max_output_tokens: this.options.maxOutputTokens,
     };
     const startMs = Date.now();
@@ -81,6 +86,14 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       timeMs: Date.now() - startMs,
     });
     return result;
+  }
+
+  private toResponsesToolChoice(
+    toolChoice?: ToolChoice,
+  ): OpenAI.Responses.ResponseCreateParamsStreaming["tool_choice"] {
+    if (!toolChoice) return undefined;
+    if (toolChoice.type === "required") return "required";
+    return { type: "function", name: toolChoice.name };
   }
 
   private async *toCharlieStream(

@@ -149,12 +149,25 @@ export interface ChatAgentContext {
    * by the agent. Tools should mutate `systemPromptTemplate` instead.
    */
   systemPrompt?: string;
+  /**
+   * When true, the model must call at least one tool. Mutable mid-run.
+   */
+  mustCallTool: boolean;
+  /**
+   * When set, the model must call this tool. Wins over `mustCallTool`.
+   * Mutable mid-run.
+   */
+  requiredToolName?: string;
 }
 export interface ChatAgentGetResponseInput {
   messages: ChatMessage[];
   tools?: ITool[];
   systemPrompt?: string;
   meta?: ChatAgentContentMeta;
+  /** When true, the model must call at least one tool. Copied onto context. */
+  mustCallTool?: boolean;
+  /** When set, the model must call this tool. Wins over `mustCallTool`. */
+  requiredToolName?: string;
 }
 /** Token counts from one executor call. `reasoningTokens` is a breakdown when the provider reports it. */
 export interface TokenUsage {
@@ -182,10 +195,16 @@ export type ChatRun = Promise<ChatAgentGetResponseOutput> & {
 export interface ChatAgent {
   getResponse(input: ChatAgentGetResponseInput): ChatRun;
 }
+export type ToolChoice = { type: "required" } | { type: "tool"; name: string };
 export interface ChatExecutorInput {
   messages: ChatMessage[];
   tools?: ITool[];
   context: ChatAgentContext;
+  /**
+   * Resolved by AiChatAgent from context.mustCallTool / requiredToolName.
+   * Omit for provider auto.
+   */
+  toolChoice?: ToolChoice;
 }
 export interface ChatExecutor {
   /**

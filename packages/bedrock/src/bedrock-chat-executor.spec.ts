@@ -17,6 +17,7 @@ function context(producer: EventProducer) {
     modelId: "test-model",
     messages: [],
     tools: [],
+    mustCallTool: false,
     meta: {},
     eventProducer: producer,
   };
@@ -219,5 +220,93 @@ describe("BedrockChatExecutor streaming", () => {
       role: "assistant",
       content: "42",
     });
+  });
+
+  it("maps required toolChoice to toolConfig.toolChoice any", async () => {
+    const producer = new EventProducer();
+    const converseStream = jest.fn().mockResolvedValue({
+      stream: asyncChunks([{ contentBlockDelta: { delta: { text: "ok" } } }]),
+    });
+    const executor = new BedrockChatExecutor({
+      modelId: "anthropic.claude-test",
+      client: { converseStream } as never,
+    });
+    await executor.execute({
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object" },
+          handle: async () => "pong",
+        },
+      ],
+      toolChoice: { type: "required" },
+      context: context(producer),
+    });
+    expect(converseStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolConfig: expect.objectContaining({ toolChoice: { any: {} } }),
+      }),
+    );
+  });
+
+  it("maps named toolChoice to toolConfig.toolChoice tool", async () => {
+    const producer = new EventProducer();
+    const converseStream = jest.fn().mockResolvedValue({
+      stream: asyncChunks([{ contentBlockDelta: { delta: { text: "ok" } } }]),
+    });
+    const executor = new BedrockChatExecutor({
+      modelId: "anthropic.claude-test",
+      client: { converseStream } as never,
+    });
+    await executor.execute({
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object" },
+          handle: async () => "pong",
+        },
+      ],
+      toolChoice: { type: "tool", name: "ping" },
+      context: context(producer),
+    });
+    expect(converseStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolConfig: expect.objectContaining({
+          toolChoice: { tool: { name: "ping" } },
+        }),
+      }),
+    );
+  });
+
+  it("omits toolChoice when toolsSupported is false", async () => {
+    const producer = new EventProducer();
+    const converseStream = jest.fn().mockResolvedValue({
+      stream: asyncChunks([{ contentBlockDelta: { delta: { text: "ok" } } }]),
+    });
+    const executor = new BedrockChatExecutor({
+      modelId: "anthropic.claude-test",
+      toolsSupported: false,
+      client: { converseStream } as never,
+    });
+    await executor.execute({
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object" },
+          handle: async () => "pong",
+        },
+      ],
+      toolChoice: { type: "required" },
+      context: context(producer),
+    });
+    expect(converseStream).toHaveBeenCalledWith(
+      expect.objectContaining({ toolConfig: undefined }),
+    );
   });
 });

@@ -20,6 +20,7 @@ export {
   MessageUser,
   ChatRun,
   TokenUsage,
+  ToolChoice,
   TextEmbeddingGenerator,
   TextEmbeddingInput,
   TextEmbeddingOutput,

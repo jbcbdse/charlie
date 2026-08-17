@@ -35,6 +35,7 @@ function context(): ChatExecutorInput["context"] {
     modelId: "gpt-5.4",
     messages: [],
     tools: [],
+    mustCallTool: false,
     meta: {},
     eventProducer: { emit: jest.fn() },
   } as unknown as ChatExecutorInput["context"];
@@ -294,5 +295,69 @@ describe("OpenAiResponsesExecutor", () => {
         messages: [{ role: "user", content: "hi" }],
       }),
     ).rejects.toThrow(/without a completed response/);
+  });
+
+  it("maps required toolChoice to tool_choice required", async () => {
+    const create = jest.fn().mockResolvedValue(
+      completedStream({
+        output: [
+          { type: "message", content: [{ type: "output_text", text: "ok" }] },
+        ],
+        output_text: "ok",
+      }),
+    );
+    const executor = new OpenAiResponsesExecutor({
+      modelId: "gpt-5.4",
+      openAiClient: { responses: { create } } as unknown as OpenAI,
+    });
+    await executor.execute({
+      context: context(),
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object" },
+          handle: jest.fn(),
+        },
+      ],
+      toolChoice: { type: "required" },
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ tool_choice: "required" }),
+    );
+  });
+
+  it("maps named toolChoice to a function tool_choice", async () => {
+    const create = jest.fn().mockResolvedValue(
+      completedStream({
+        output: [
+          { type: "message", content: [{ type: "output_text", text: "ok" }] },
+        ],
+        output_text: "ok",
+      }),
+    );
+    const executor = new OpenAiResponsesExecutor({
+      modelId: "gpt-5.4",
+      openAiClient: { responses: { create } } as unknown as OpenAI,
+    });
+    await executor.execute({
+      context: context(),
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object" },
+          handle: jest.fn(),
+        },
+      ],
+      toolChoice: { type: "tool", name: "ping" },
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool_choice: { type: "function", name: "ping" },
+      }),
+    );
   });
 });

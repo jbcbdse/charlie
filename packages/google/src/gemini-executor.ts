@@ -8,6 +8,7 @@ import {
 } from "@jbcbdse/charlie-core";
 import {
   GenerateContentRequest,
+  FunctionCallingMode,
   GenerativeModel,
   GoogleGenerativeAI,
 } from "@google/generative-ai";
@@ -37,11 +38,23 @@ export class GeminiExecutor implements ChatExecutor {
   public async execute(
     input: ChatExecutorInput,
   ): Promise<ChatAgentGetResponseOutput> {
-    const { context, messages, tools } = input;
+    const { context, messages, tools, toolChoice } = input;
     const req: GenerateContentRequest = {
       contents: this.messageConverter.toContentObjects(messages),
       tools: tools ? await this.toolConverter.toGeminiTools(tools) : [],
       systemInstruction: context.systemPrompt,
+      ...(toolChoice && tools?.length
+        ? {
+            toolConfig: {
+              functionCallingConfig: {
+                mode: FunctionCallingMode.ANY,
+                ...(toolChoice.type === "tool"
+                  ? { allowedFunctionNames: [toolChoice.name] }
+                  : {}),
+              },
+            },
+          }
+        : {}),
     };
     const startMs = Date.now();
     context.eventProducer.emit(EventName.ChatRawRequest, {

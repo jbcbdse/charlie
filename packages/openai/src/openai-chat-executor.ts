@@ -9,6 +9,7 @@ import {
   EventName,
   CharlieStreamConsumer,
   CharlieStreamPart,
+  ToolChoice,
 } from "@jbcbdse/charlie-core";
 
 export interface OpenAiChatExecutorOptions {
@@ -44,6 +45,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
     messages,
     tools,
     context,
+    toolChoice,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const openAiMessages = this.toOpenAiMessages(messages);
     if (context.systemPrompt) {
@@ -65,6 +67,9 @@ export class OpenAiChatExecutor implements ChatExecutor {
             parameters: tool.jsonSchema,
           },
         })),
+      tool_choice: tools?.length
+        ? this.toOpenAiToolChoice(toolChoice)
+        : undefined,
     };
     const chatExecutorStartMs = Date.now();
     context.eventProducer.emit(EventName.ChatRawRequest, {
@@ -157,6 +162,14 @@ export class OpenAiChatExecutor implements ChatExecutor {
         };
       }
     }
+  }
+
+  private toOpenAiToolChoice(
+    toolChoice?: ToolChoice,
+  ): OpenAiCompletionsRequest["tool_choice"] {
+    if (!toolChoice) return undefined;
+    if (toolChoice.type === "required") return "required";
+    return { type: "function", function: { name: toolChoice.name } };
   }
 
   private toOpenAiMessages(messages: ChatMessage[]): OpenAiChatMessage[] {

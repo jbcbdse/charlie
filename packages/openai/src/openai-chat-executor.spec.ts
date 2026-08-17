@@ -17,6 +17,7 @@ function context(producer: EventProducer) {
     modelId: "test-model",
     messages: [],
     tools: [],
+    mustCallTool: false,
     meta: {},
     eventProducer: producer,
   };
@@ -267,5 +268,75 @@ describe("OpenAiChatExecutor streaming", () => {
       role: "assistant",
       content: "42",
     });
+  });
+
+  it("maps required toolChoice to tool_choice required", async () => {
+    const producer = new EventProducer();
+    const create = jest
+      .fn()
+      .mockResolvedValue(
+        asyncChunks([{ choices: [{ delta: { content: "ok" } }] }]),
+      );
+    const executor = new OpenAiChatExecutor({
+      modelId: "test-model",
+      openAiClient: {
+        chat: { completions: { create } },
+      } as never,
+    });
+    await executor.execute({
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object" },
+          handle: async () => "pong",
+        },
+        {
+          name: "other",
+          description: "other",
+          jsonSchema: { type: "object" },
+          handle: async () => "other",
+        },
+      ],
+      toolChoice: { type: "required" },
+      context: context(producer),
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ tool_choice: "required" }),
+    );
+  });
+
+  it("maps named toolChoice to a function tool_choice", async () => {
+    const producer = new EventProducer();
+    const create = jest
+      .fn()
+      .mockResolvedValue(
+        asyncChunks([{ choices: [{ delta: { content: "ok" } }] }]),
+      );
+    const executor = new OpenAiChatExecutor({
+      modelId: "test-model",
+      openAiClient: {
+        chat: { completions: { create } },
+      } as never,
+    });
+    await executor.execute({
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object" },
+          handle: async () => "pong",
+        },
+      ],
+      toolChoice: { type: "tool", name: "ping" },
+      context: context(producer),
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tool_choice: { type: "function", function: { name: "ping" } },
+      }),
+    );
   });
 });
