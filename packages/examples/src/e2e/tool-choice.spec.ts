@@ -75,7 +75,7 @@ async function ollamaAvailable(): Promise<boolean> {
 }
 
 function isUnavailable(error: unknown): boolean {
-  return /not available for this account|permission_error|access_denied|access denied|legacy|UnrecognizedClient|ExpiredToken|InvalidClientTokenId|Unauthorized|credentials|does not support tool_choice|Only 'auto' tool_choice/i.test(
+  return /not available for this account|permission_error|access_denied|access denied|legacy|UnrecognizedClient|ExpiredToken|InvalidClientTokenId|Unauthorized|credentials|does not support tool_choice|Only 'auto' tool_choice|timeout|ETIMEDOUT|timed out/i.test(
     String(error),
   );
 }
@@ -129,6 +129,7 @@ const cases: ExecutorCase[] = [
       new GrokExecutor({
         modelId: "grok-4.3",
         apiKey: process.env.XAI_API_KEY,
+        timeout: 25_000,
       }),
   },
   {

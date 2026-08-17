@@ -13,7 +13,7 @@
     "start:repl": "ts-node ./src/repl/index.ts",
     "start:server": "ts-node ./src/server/index.ts",
     "test": "jest",
-    "test:e2e": "jest --testPathPattern=e2e --testPathIgnorePatterns='[]'"
+    "test:e2e": "jest --runInBand --testPathPattern=e2e --testPathIgnorePatterns='[]'"
   },
   "author": "Jonathan Barnett",
   "license": "MIT",
