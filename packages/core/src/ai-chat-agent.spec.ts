@@ -388,6 +388,17 @@ describe("AiChatAgent", () => {
         { type: "tool", name: "CalculatorTool" },
       ]);
     });
+    it("clears mustCallTool after the first execute so the tool loop can finish", async () => {
+      const capturing = chatExecutor as MockExecutor;
+      await agent.getResponse({
+        messages: [{ role: "user", content: "Calculate 3 + 4" }],
+        tools: [new CalculatorTool()],
+        mustCallTool: true,
+      });
+      expect(
+        capturing.execute.mock.calls.map((call) => call[0].toolChoice),
+      ).toEqual([{ type: "required" }, undefined]);
+    });
   });
 
   describe("eventProducer injection", () => {

@@ -127,12 +127,17 @@ export class AiChatAgent implements ChatAgent {
         systemPrompt: context.systemPrompt,
         modelId: this.chatExecutor.modelId,
       });
+      const toolChoice = this.resolveToolChoice(context);
       const response = await this.chatExecutor.execute({
         messages: context.messages,
         tools: context.tools.length ? context.tools : undefined,
         context,
-        toolChoice: this.resolveToolChoice(context),
+        toolChoice,
       });
+      if (toolChoice) {
+        context.mustCallTool = false;
+        context.requiredToolName = undefined;
+      }
       let newResponseMessages = response.responseMessages;
       for (const transformer of this.preToolCallTransformers) {
         newResponseMessages = await transformer.transform(

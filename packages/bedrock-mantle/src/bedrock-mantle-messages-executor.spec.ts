@@ -141,4 +141,26 @@ describe("BedrockMantleMessagesExecutor streaming", () => {
       }),
     );
   });
+
+  it("throws when toolChoice is set with extended thinking", async () => {
+    const executor = new BedrockMantleMessagesExecutor({
+      thinking: { type: "enabled", budget_tokens: 1024 },
+      anthropicClient: { messages: { create: jest.fn() } } as never,
+    });
+    await expect(
+      executor.execute({
+        context: context() as never,
+        messages: [{ role: "user", content: "hello" }],
+        tools: [
+          {
+            name: "ping",
+            description: "ping",
+            jsonSchema: { type: "object" },
+            handle: async () => "pong",
+          },
+        ],
+        toolChoice: { type: "required" },
+      }),
+    ).rejects.toThrow(/extended thinking/);
+  });
 });

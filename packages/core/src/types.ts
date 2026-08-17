@@ -152,7 +152,7 @@ export interface ChatAgentContext {
   /**
    * When true, the model must call at least one tool. Mutable mid-run.
    */
-  mustCallTool: boolean;
+  mustCallTool?: boolean;
   /**
    * When set, the model must call this tool. Wins over `mustCallTool`.
    * Mutable mid-run.

@@ -125,6 +125,11 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
     toolChoice?: ToolChoice,
   ): { type: "any" } | { type: "tool"; name: string } | undefined {
     if (!toolChoice) return undefined;
+    if (this.thinking) {
+      throw new Error(
+        "toolChoice cannot be used with Anthropic extended thinking",
+      );
+    }
     if (toolChoice.type === "required") return { type: "any" };
     return { type: "tool", name: toolChoice.name };
   }

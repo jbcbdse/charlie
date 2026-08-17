@@ -4,7 +4,7 @@ import baseConfig from "../../jest.config";
 const jestConfig: JestConfigWithTsJest = {
   ...baseConfig,
   rootDir: "./src",
-  testPathIgnorePatterns: ["/e2e/"],
+  testPathIgnorePatterns: ["/node_modules/", "/e2e/"],
   globals: {
     "ts-jest": {
       tsconfig: "./tsconfig.test.json",
