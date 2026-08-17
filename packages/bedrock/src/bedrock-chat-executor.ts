@@ -13,6 +13,7 @@ import {
   EventName,
   CharlieStreamConsumer,
   CharlieStreamPart,
+  ToolChoice,
 } from "@jbcbdse/charlie-core";
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
@@ -71,6 +72,7 @@ export class BedrockChatExecutor implements ChatExecutor {
     messages,
     tools,
     context,
+    toolChoice,
   }: ChatExecutorInput): Promise<ChatAgentGetResponseOutput> {
     const [systemPrompts, remainingMessages] =
       this.extractLeadingSystemMessages(messages);
@@ -96,6 +98,7 @@ export class BedrockChatExecutor implements ChatExecutor {
     }
     const bedrockMessages =
       this.messageConverter.toBedrockMessages(remainingMessages);
+    const mappedToolChoice = this.toBedrockToolChoice(toolChoice);
     const toolConfig = {
       tools:
         tools &&
@@ -108,6 +111,7 @@ export class BedrockChatExecutor implements ChatExecutor {
             description: tool.description,
           },
         })),
+      ...(mappedToolChoice ? { toolChoice: mappedToolChoice } : {}),
     };
     const request: ConverseCommandInput = {
       modelId: this.modelId,
@@ -153,6 +157,14 @@ export class BedrockChatExecutor implements ChatExecutor {
       timeMs: Date.now() - chatExecutorStartMs,
     });
     return result;
+  }
+
+  private toBedrockToolChoice(
+    toolChoice?: ToolChoice,
+  ): { any: Record<string, never> } | { tool: { name: string } } | undefined {
+    if (!toolChoice) return undefined;
+    if (toolChoice.type === "required") return { any: {} };
+    return { tool: { name: toolChoice.name } };
   }
 
   private async executeNonStream(

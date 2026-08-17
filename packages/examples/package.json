@@ -12,7 +12,8 @@
     "lint": "eslint --config ../../eslint.config.mjs .",
     "start:repl": "ts-node ./src/repl/index.ts",
     "start:server": "ts-node ./src/server/index.ts",
-    "test": "jest"
+    "test": "jest",
+    "test:e2e": "jest --runInBand --testPathPattern=e2e --testPathIgnorePatterns='[]'"
   },
   "author": "Jonathan Barnett",
   "license": "MIT",

@@ -10,6 +10,7 @@ import {
   MessageTool,
   MessageAssistant,
   ChatRun,
+  ToolChoice,
 } from "./types";
 import { ToolExecutor } from "./tool-executor";
 import { EventName, eventProducer, EventProducer } from "./event-producer";
@@ -54,10 +55,19 @@ export class AiChatAgent implements ChatAgent {
     messages,
     tools,
     meta = {},
+    mustCallTool,
+    requiredToolName,
   }: ChatAgentGetResponseInput): ChatRun {
     const runId = newRunId();
     return new ChatRunGenerator(this.eventProducer, runId, () =>
-      this.runLoop({ messages, tools, meta, runId }),
+      this.runLoop({
+        messages,
+        tools,
+        meta,
+        mustCallTool,
+        requiredToolName,
+        runId,
+      }),
     ).create();
   }
 
@@ -65,6 +75,8 @@ export class AiChatAgent implements ChatAgent {
     messages,
     tools,
     meta,
+    mustCallTool,
+    requiredToolName,
     runId,
   }: ChatAgentGetResponseInput & {
     runId: string;
@@ -80,6 +92,8 @@ export class AiChatAgent implements ChatAgent {
       eventProducer: this.eventProducer,
       systemPromptTemplate: this.systemPromptTemplate,
       systemPrompt: undefined,
+      mustCallTool: mustCallTool ?? false,
+      requiredToolName,
     };
     const chatStartMs = Date.now();
     for (const transformer of this.preRunTransformers) {
@@ -113,11 +127,17 @@ export class AiChatAgent implements ChatAgent {
         systemPrompt: context.systemPrompt,
         modelId: this.chatExecutor.modelId,
       });
+      const toolChoice = this.resolveToolChoice(context);
       const response = await this.chatExecutor.execute({
         messages: context.messages,
         tools: context.tools.length ? context.tools : undefined,
         context,
+        toolChoice,
       });
+      if (toolChoice) {
+        context.mustCallTool = false;
+        context.requiredToolName = undefined;
+      }
       let newResponseMessages = response.responseMessages;
       for (const transformer of this.preToolCallTransformers) {
         newResponseMessages = await transformer.transform(
@@ -203,5 +223,22 @@ export class AiChatAgent implements ChatAgent {
       timeMs: Date.now() - toolStartMs,
     });
     return toolMessages;
+  }
+
+  private resolveToolChoice(context: ChatAgentContext): ToolChoice | undefined {
+    const name = context.requiredToolName;
+    if (name) {
+      if (!context.tools.some((tool) => tool.name === name)) {
+        throw new Error(`Required tool "${name}" is not in context.tools`);
+      }
+      return { type: "tool", name };
+    }
+    if (context.mustCallTool) {
+      if (context.tools.length === 0) {
+        throw new Error("mustCallTool is set but no tools are available");
+      }
+      return { type: "required" };
+    }
+    return undefined;
   }
 }

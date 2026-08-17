@@ -14,6 +14,7 @@ function emitText(producer: EventProducer, runId: string, text: string): void {
       modelId: "m",
       messages: [],
       tools: [],
+      mustCallTool: false,
       meta: {},
       eventProducer: producer,
     },

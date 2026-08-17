@@ -34,6 +34,7 @@ describe("GeminiExecutor streaming", () => {
         modelId: "gemini-test",
         messages: [],
         tools: [],
+        mustCallTool: false,
         meta: {},
         eventProducer: producer,
       },
@@ -52,5 +53,104 @@ describe("GeminiExecutor streaming", () => {
       reasoningTokens: 3,
     });
     expect(producer.emitter.listenerCount(EventName.ChatStreamChunk)).toBe(0);
+  });
+
+  it("maps required toolChoice to functionCallingConfig ANY", async () => {
+    const generateContentStream = jest.fn().mockResolvedValue({
+      stream: {
+        async *[Symbol.asyncIterator]() {
+          yield { candidates: [{ content: { parts: [{ text: "ok" }] } }] };
+        },
+      },
+      response: Promise.resolve({
+        candidates: [{ content: { role: "model", parts: [{ text: "ok" }] } }],
+      }),
+    });
+    const executor = new GeminiExecutor({
+      modelId: "gemini-test",
+      apiKey: "test",
+    });
+    (
+      executor as unknown as { model: { generateContentStream: unknown } }
+    ).model = { generateContentStream };
+    await executor.execute({
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object", properties: {} },
+          handle: async () => "pong",
+        },
+      ],
+      toolChoice: { type: "required" },
+      context: {
+        runId: "run-1",
+        modelId: "gemini-test",
+        messages: [],
+        tools: [],
+        mustCallTool: false,
+        meta: {},
+        eventProducer: new EventProducer(),
+      },
+    });
+    expect(generateContentStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolConfig: {
+          functionCallingConfig: { mode: "ANY" },
+        },
+      }),
+    );
+  });
+
+  it("maps named toolChoice to ANY with allowedFunctionNames", async () => {
+    const generateContentStream = jest.fn().mockResolvedValue({
+      stream: {
+        async *[Symbol.asyncIterator]() {
+          yield { candidates: [{ content: { parts: [{ text: "ok" }] } }] };
+        },
+      },
+      response: Promise.resolve({
+        candidates: [{ content: { role: "model", parts: [{ text: "ok" }] } }],
+      }),
+    });
+    const executor = new GeminiExecutor({
+      modelId: "gemini-test",
+      apiKey: "test",
+    });
+    (
+      executor as unknown as { model: { generateContentStream: unknown } }
+    ).model = { generateContentStream };
+    await executor.execute({
+      messages: [{ role: "user", content: "hello" }],
+      tools: [
+        {
+          name: "ping",
+          description: "ping",
+          jsonSchema: { type: "object", properties: {} },
+          handle: async () => "pong",
+        },
+      ],
+      toolChoice: { type: "tool", name: "ping" },
+      context: {
+        runId: "run-1",
+        modelId: "gemini-test",
+        messages: [],
+        tools: [],
+        mustCallTool: false,
+        meta: {},
+        eventProducer: new EventProducer(),
+      },
+    });
+    expect(generateContentStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        toolConfig: {
+          functionCallingConfig: {
+            mode: "ANY",
+            allowedFunctionNames: ["ping"],
+          },
+        },
+      }),
+    );
   });
 });
