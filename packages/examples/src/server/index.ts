@@ -25,6 +25,10 @@ import {
 } from "@jbcbdse/charlie-bedrock-mantle";
 import { OllamaExecutor } from "@jbcbdse/charlie-ollama";
 import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
+import {
+  createCharlieMcpHttpHandler,
+  toNodeHttpHandler,
+} from "@jbcbdse/charlie-mcp-server";
 import dotenv from "dotenv";
 import { DirectBirthdayTool } from "../tools/direct-birthday.tool";
 import { DeleteAccountTool } from "../tools/delete-account.tool";
@@ -224,6 +228,13 @@ async function start() {
   const tools = [...localTools, ...mcp.tools];
   app.get("/agents", agentsHandler(availableAgents));
   app.post("/chat", chatHandler(agents, availableAgents, tools, appEvents));
+  // Exposes localTools as an MCP server, over HTTP, mounted as a plain
+  // Express route via @jbcbdse/charlie-mcp-server's Node req/res adapter.
+  const mcpToolServer = createCharlieMcpHttpHandler(localTools, {
+    name: "charlie-examples",
+    version: "0.5.0",
+  });
+  app.all("/mcp", toNodeHttpHandler(mcpToolServer));
   const shutdown = async () => {
     await mcp.close();
     process.exit(0);

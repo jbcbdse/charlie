@@ -1,0 +1,35 @@
+{
+  "name": "@jbcbdse/charlie-mcp-server",
+  "version": "0.5.0",
+  "description": "Expose Charlie ITool[] as an MCP server: transport-agnostic factory plus stdio, Web-standard HTTP, and Node req/res adapters",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jbcbdse/charlie.git"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json"
+  ],
+  "scripts": {
+    "build": "tsc -p ./tsconfig.json",
+    "lint": "eslint --config ../../eslint.config.mjs .",
+    "test": "jest"
+  },
+  "author": "Jonathan Barnett",
+  "license": "MIT",
+  "dependencies": {
+    "@jbcbdse/charlie-core": "^0.5.0",
+    "@modelcontextprotocol/server": "^2.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "zod": "^3.23.8"
+  }
+}
