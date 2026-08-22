@@ -4,7 +4,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
 jest.setTimeout(20000);
 
-describe("serveCharlieMcpStdio", () => {
+describe("CharlieMcpStdioServer", () => {
   it("serves Charlie tools to a real MCP client over a stdio subprocess", async () => {
     const packageRoot = path.resolve(__dirname, "..");
     const entry = path.resolve(__dirname, "./test-fixtures/stdio-entry.ts");

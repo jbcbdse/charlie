@@ -5,13 +5,18 @@ as a real MCP server. This is the reverse of `@jbcbdse/charlie-mcp`, which lets
 Charlie *call* tools from external MCP servers — this package lets an external
 MCP client call *Charlie's* tools.
 
+Three classes, each constructed with an options object (`tools`, `name`,
+`version`, plus transport-specific options) — no factory functions to thread
+through. Constructing one is enough to hand it to a DI container (Nest
+`FactoryProvider`, InversifyJS, etc.) as a plain injectable instance.
+
 ## Why the low-level `Server`, not `McpServer`
 
 `ITool.jsonSchema` is already JSON Schema (built by `zod-to-json-schema` from
 the tool's Zod v3 schema). The SDK's high-level `McpServer.registerTool()`
 wants a Zod schema, and `@modelcontextprotocol/server` ships Zod v4 internally
 — mixing the two would mean converting Charlie's Zod v3 schema through JSON
-Schema and back into a different Zod major version. Instead, this package
+Schema and back into a different Zod major version. Instead, `CharlieMcpServer`
 registers `tools/list` / `tools/call` handlers on the low-level `Server`
 directly and hands JSON Schema straight through, since that is exactly what
 the MCP wire format wants for `Tool.inputSchema`. `Server` is marked
@@ -22,45 +27,53 @@ catalog is the "advanced use case" the SDK docs point at `Server` for.
 ## Quickstart
 
 ```ts
-import { createCharlieMcpServerFactory, serveCharlieMcpStdio } from "@jbcbdse/charlie-mcp-server";
+import { CharlieMcpStdioServer } from "@jbcbdse/charlie-mcp-server";
 import { CalculatorTool } from "./tools/calculator.tool";
 
 // stdio — for Claude Desktop, CLI agents, or anything that spawns you as a child process
-serveCharlieMcpStdio([new CalculatorTool()], {
+new CharlieMcpStdioServer({
+  tools: [new CalculatorTool()],
   name: "my-charlie-tools",
   version: "1.0.0",
-});
+}).serve();
 ```
 
 ## HTTP, and mounting in Express or NestJS
 
-`createCharlieMcpHttpHandler` builds a Web-standard handler
-(`fetch(request) => Promise<Response>`) — framework-agnostic by construction.
-`toNodeHttpHandler` bridges it onto Node's classic `(req, res)` shape, so it
-drops straight into an Express route:
+`CharlieMcpHttpHandler` wraps a Web-standard handler
+(`fetch(request) => Promise<Response>`) — framework-agnostic by construction
+— plus a `handle(req, res)` method that bridges Node's classic request/
+response shape, so an instance drops straight into an Express route:
 
 ```ts
 import express from "express";
-import { createCharlieMcpHttpHandler, toNodeHttpHandler } from "@jbcbdse/charlie-mcp-server";
+import { CharlieMcpHttpHandler } from "@jbcbdse/charlie-mcp-server";
 
-const handler = createCharlieMcpHttpHandler(tools, {
+const mcpHandler = new CharlieMcpHttpHandler({
+  tools,
   name: "my-charlie-tools",
   version: "1.0.0",
 });
 
 const app = express();
 app.use(express.json());
-app.all("/mcp", toNodeHttpHandler(handler));
+app.all("/mcp", (req, res) => mcpHandler.handle(req, res));
 ```
 
-The same adapter works verbatim in a NestJS controller on the (default)
-Express platform, since Nest hands route handlers the underlying Node
-`req`/`res` there too:
+The same instance and method work verbatim in a NestJS controller on the
+(default) Express platform, since Nest hands route handlers the underlying
+Node `req`/`res` there too. Construct it once, e.g. via a `FactoryProvider`,
+and inject it:
 
 ```ts
-@All("mcp")
-mcp(@Req() req: Request, @Res() res: Response) {
-  return toNodeHttpHandler(handler)(req, res);
+@Injectable()
+export class McpController {
+  constructor(private readonly mcpHandler: CharlieMcpHttpHandler) {}
+
+  @All("mcp")
+  mcp(@Req() req: Request, @Res() res: Response) {
+    return this.mcpHandler.handle(req, res);
+  }
 }
 ```
 
@@ -68,9 +81,12 @@ A Fastify-platform Nest app would need Fastify's own request/response bridge
 instead — not something this package builds.
 
 If Express (or similar) body-parsing middleware already populated `req.body`,
-`toNodeHttpHandler` forwards it as `parsedBody` automatically, since the
-request stream has already been consumed by that middleware and cannot be
-re-read.
+`handle` forwards it as `parsedBody` automatically, since the request stream
+has already been consumed by that middleware and cannot be re-read.
+
+`CharlieMcpHttpHandler` also exposes `fetch(request, options?)` directly, for
+Web-standard runtimes that don't need the Node bridge, and `close()` to tear
+down the underlying handler.
 
 ## Tool-call semantics
 
@@ -88,5 +104,4 @@ re-read.
   call — never fire here. If a tool handler emits `ToolProgress`/`Log` itself
   via `context.eventProducer`, that is still observable: by default it goes
   through core's shared `eventProducer` singleton (same as `AiChatAgent`),
-  or pass your own via the `eventProducer` option to
-  `createCharlieMcpServerFactory`/`serveCharlieMcpStdio`/`createCharlieMcpHttpHandler`.
+  or pass your own via the `eventProducer` constructor option.

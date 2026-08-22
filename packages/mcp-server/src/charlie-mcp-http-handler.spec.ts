@@ -4,8 +4,7 @@ import {
   Client,
   StreamableHTTPClientTransport,
 } from "@modelcontextprotocol/client";
-import { createCharlieMcpHttpHandler } from "./http";
-import { toNodeHttpHandler } from "./node-http-adapter";
+import { CharlieMcpHttpHandler } from "./charlie-mcp-http-handler";
 import { EchoTool, FailingTool } from "./test-fixtures/echo-tool";
 
 /**
@@ -29,16 +28,17 @@ function withParsedJsonBody(
   };
 }
 
-describe("toNodeHttpHandler", () => {
+describe("CharlieMcpHttpHandler", () => {
   let server: http.Server;
   let baseUrl: URL;
 
   beforeAll(async () => {
-    const handler = createCharlieMcpHttpHandler(
-      [new EchoTool(), new FailingTool()],
-      { name: "charlie-mcp-server-http-test", version: "0.0.0" },
-    );
-    server = http.createServer(toNodeHttpHandler(handler));
+    const mcpHandler = new CharlieMcpHttpHandler({
+      tools: [new EchoTool(), new FailingTool()],
+      name: "charlie-mcp-server-http-test",
+      version: "0.0.0",
+    });
+    server = http.createServer((req, res) => mcpHandler.handle(req, res));
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const { port } = server.address() as AddressInfo;
     baseUrl = new URL(`http://127.0.0.1:${port}/mcp`);
@@ -82,16 +82,19 @@ describe("toNodeHttpHandler", () => {
   });
 });
 
-describe("toNodeHttpHandler behind body-parsing middleware", () => {
+describe("CharlieMcpHttpHandler behind body-parsing middleware", () => {
   let server: http.Server;
   let baseUrl: URL;
 
   beforeAll(async () => {
-    const handler = createCharlieMcpHttpHandler([new EchoTool()], {
+    const mcpHandler = new CharlieMcpHttpHandler({
+      tools: [new EchoTool()],
       name: "charlie-mcp-server-http-prebody-test",
       version: "0.0.0",
     });
-    server = http.createServer(withParsedJsonBody(toNodeHttpHandler(handler)));
+    server = http.createServer(
+      withParsedJsonBody((req, res) => mcpHandler.handle(req, res)),
+    );
     await new Promise<void>((resolve) => server.listen(0, resolve));
     const { port } = server.address() as AddressInfo;
     baseUrl = new URL(`http://127.0.0.1:${port}/mcp`);

@@ -3,27 +3,27 @@ import {
   type McpRequestContext,
 } from "@modelcontextprotocol/server";
 import { Client } from "@modelcontextprotocol/client";
-import { createCharlieMcpServerFactory } from "./charlie-mcp-server-factory";
+import { CharlieMcpServer } from "./charlie-mcp-server";
 import { EchoTool, FailingTool } from "./test-fixtures/echo-tool";
 
 async function connectClient(): Promise<Client> {
-  const tools = [new EchoTool(), new FailingTool()];
-  const factory = createCharlieMcpServerFactory(tools, {
+  const mcpServer = new CharlieMcpServer({
+    tools: [new EchoTool(), new FailingTool()],
     name: "charlie-mcp-server-test",
     version: "0.0.0",
   });
-  const server = await factory({} as McpRequestContext);
+  const server = mcpServer.toFactory()({} as McpRequestContext);
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "test-client", version: "0.0.0" });
   await Promise.all([
-    server.connect(serverTransport),
+    Promise.resolve(server).then((s) => s.connect(serverTransport)),
     client.connect(clientTransport),
   ]);
   return client;
 }
 
-describe("createCharlieMcpServerFactory", () => {
+describe("CharlieMcpServer", () => {
   it("lists tools with name, description, and jsonSchema-derived inputSchema", async () => {
     const client = await connectClient();
     try {

@@ -1,38 +1,74 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { McpHttpHandler } from "@modelcontextprotocol/server";
+import {
+  createMcpHandler,
+  type CreateMcpHandlerOptions,
+  type McpHandlerRequestOptions,
+  type McpHttpHandler,
+} from "@modelcontextprotocol/server";
+import {
+  CharlieMcpServer,
+  type CharlieMcpServerOptions,
+} from "./charlie-mcp-server";
+
+export type CharlieMcpHttpHandlerOptions = CharlieMcpServerOptions &
+  CreateMcpHandlerOptions;
 
 /**
- * Bridges a Web-standard `McpHttpHandler` onto Node's classic `(req, res)`
- * handler shape, so it can be mounted directly as a route:
+ * A Web-standard MCP HTTP handler (`fetch`) for Charlie tools, plus a
+ * `handle` bridge onto Node's classic `(req, res)` shape — so it mounts
+ * directly as an Express route, or a NestJS controller on the (default)
+ * Express platform, since both hand route handlers the underlying Node
+ * `IncomingMessage`/`ServerResponse`:
  *
  * ```ts
- * app.all("/mcp", toNodeHttpHandler(handler));
+ * const mcpHandler = new CharlieMcpHttpHandler({ tools, name: "my-charlie-tools", version: "1.0.0" });
+ * app.all("/mcp", (req, res) => mcpHandler.handle(req, res));
  * ```
  *
- * This works verbatim in Express and in a NestJS controller on the (default)
- * Express platform, since both hand route handlers the underlying Node
- * `IncomingMessage`/`ServerResponse`. A Fastify-platform Nest app needs
- * Fastify's own request/response bridge instead.
+ * Constructing this once and providing the instance (e.g. via a Nest
+ * `FactoryProvider`) is the intended usage — `fetch`/`handle`/`close` are
+ * instance methods with no hidden per-call setup. A Fastify-platform Nest
+ * app needs Fastify's own request/response bridge instead of `handle`.
  *
  * If Express (or similar) body-parsing middleware already ran and left
- * `req.body` populated, it is forwarded as `parsedBody` — the request stream
- * has already been consumed by that middleware, so it cannot be re-read here.
+ * `req.body` populated, `handle` forwards it as `parsedBody` — the request
+ * stream has already been consumed by that middleware, so it cannot be
+ * re-read here.
  */
-export function toNodeHttpHandler(
-  handler: McpHttpHandler,
-): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
-  return async (req, res) => {
+export class CharlieMcpHttpHandler {
+  private readonly handler: McpHttpHandler;
+
+  constructor(options: CharlieMcpHttpHandlerOptions) {
+    const mcpServer = new CharlieMcpServer(options);
+    this.handler = createMcpHandler(mcpServer.toFactory(), options);
+  }
+
+  public fetch(
+    request: Request,
+    options?: McpHandlerRequestOptions,
+  ): Promise<Response> {
+    return this.handler.fetch(request, options);
+  }
+
+  public async handle(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
     const parsedBody = (req as IncomingMessage & { body?: unknown }).body;
     // If body-parsing middleware already ran, req's stream is already
     // consumed — build a bodyless Request and forward parsedBody instead of
     // re-reading (and thereby throwing on) the now-disturbed stream.
     const request = toWebRequest(req, parsedBody !== undefined);
-    const response = await handler.fetch(
+    const response = await this.fetch(
       request,
       parsedBody === undefined ? undefined : { parsedBody },
     );
     await writeWebResponse(response, res);
-  };
+  }
+
+  public close(): Promise<void> {
+    return this.handler.close();
+  }
 }
 
 function toWebRequest(
