@@ -9,4 +9,6 @@ export {
 export {
   CharlieMcpHttpHandler,
   type CharlieMcpHttpHandlerOptions,
+  type CharlieMcpHttpFetchOptions,
+  type CharlieMcpHttpHandleOptions,
 } from "./charlie-mcp-http-handler";

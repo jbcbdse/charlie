@@ -12,17 +12,16 @@ through. Constructing one is enough to hand it to a DI container (Nest
 
 ## Why the low-level `Server`, not `McpServer`
 
-`ITool.jsonSchema` is already JSON Schema (built by `zod-to-json-schema` from
-the tool's Zod v3 schema). The SDK's high-level `McpServer.registerTool()`
-wants a Zod schema, and `@modelcontextprotocol/server` ships Zod v4 internally
-— mixing the two would mean converting Charlie's Zod v3 schema through JSON
-Schema and back into a different Zod major version. Instead, `CharlieMcpServer`
-registers `tools/list` / `tools/call` handlers on the low-level `Server`
-directly and hands JSON Schema straight through, since that is exactly what
-the MCP wire format wants for `Tool.inputSchema`. `Server` is marked
-`@deprecated` in favor of `McpServer` in the SDK, but that note is about the
-ergonomics of hand-authoring Zod tools — wrapping an already-external tool
-catalog is the "advanced use case" the SDK docs point at `Server` for.
+`ITool.jsonSchema` is already JSON Schema. The SDK's high-level
+`McpServer.registerTool()` wants a Standard Schema / Zod input schema, and
+not every `ITool` has one (MCP-adapted tools only have JSON Schema).
+`CharlieMcpServer` registers `tools/list` / `tools/call` handlers on the
+low-level `Server` and hands JSON Schema straight through, since that is
+exactly what the MCP wire format wants for `Tool.inputSchema`. `Server` is
+marked `@deprecated` in favor of `McpServer` in the SDK, but that note is
+about the ergonomics of hand-authoring Zod tools — wrapping an already-
+external tool catalog is the "advanced use case" the SDK docs point at
+`Server` for.
 
 ## Quickstart
 
@@ -72,7 +71,9 @@ export class McpController {
 
   @All("mcp")
   mcp(@Req() req: Request, @Res() res: Response) {
-    return this.mcpHandler.handle(req, res);
+    return this.mcpHandler.handle(req, res, {
+      meta: { user: req.user },
+    });
   }
 }
 ```
@@ -101,7 +102,16 @@ down the underlying handler.
 - Each `tools/call` gets its own `ChatAgentContext` (fresh `runId`, empty
   `messages`). There is no chat run behind an MCP call, so `ToolStart`/
   `ToolEnd` — emitted by Charlie's `ToolExecutor` around a chat-loop tool
-  call — never fire here. If a tool handler emits `ToolProgress`/`Log` itself
-  via `context.eventProducer`, that is still observable: by default it goes
-  through core's shared `eventProducer` singleton (same as `AiChatAgent`),
-  or pass your own via the `eventProducer` constructor option.
+  call — never fire here. If a tool handler emits `ToolProgress`/`Log`
+  itself via `context.eventProducer`, that is still observable in-process
+  (core's shared `eventProducer` singleton by default, or pass your own).
+  `ToolProgress` is also forwarded as MCP `notifications/progress` on that
+  same `tools/call` when the client sent a `progressToken` — SDK clients do
+  this automatically if they pass `onprogress`. HTTP can upgrade that POST
+  to SSE so the notifications arrive before the result. `Log` is not
+  forwarded. `subscriptions/listen` is unused.
+- `context.meta` is the merge of constructor `meta`, the client's
+  per-call `_meta`, then host `meta` from `handle`/`fetch` (or
+  `runWithMeta`). Host keys win, so the authorized user must come from
+  the HTTP layer — do not trust `_meta` for auth. Initialize `clientInfo`
+  is still only the client app's `name`/`version`, not end-user identity.

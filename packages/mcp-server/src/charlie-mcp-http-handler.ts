@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ChatAgentContext } from "@jbcbdse/charlie-core";
 import {
   createMcpHandler,
   type CreateMcpHandlerOptions,
@@ -12,6 +13,19 @@ import {
 
 export type CharlieMcpHttpHandlerOptions = CharlieMcpServerOptions &
   CreateMcpHandlerOptions;
+
+export type CharlieMcpHttpFetchOptions = McpHandlerRequestOptions & {
+  /** Merged into `ChatAgentContext.meta` for tools/call on this request. */
+  meta?: ChatAgentContext["meta"];
+};
+
+export type CharlieMcpHttpHandleOptions = Pick<
+  McpHandlerRequestOptions,
+  "authInfo"
+> & {
+  /** Merged into `ChatAgentContext.meta` for tools/call on this request. */
+  meta?: ChatAgentContext["meta"];
+};
 
 /**
  * A Web-standard MCP HTTP handler (`fetch`) for Charlie tools, plus a
@@ -36,86 +50,92 @@ export type CharlieMcpHttpHandlerOptions = CharlieMcpServerOptions &
  * re-read here.
  */
 export class CharlieMcpHttpHandler {
+  private readonly mcpServer: CharlieMcpServer;
   private readonly handler: McpHttpHandler;
 
   constructor(options: CharlieMcpHttpHandlerOptions) {
-    const mcpServer = new CharlieMcpServer(options);
-    this.handler = createMcpHandler(mcpServer.toFactory(), options);
+    this.mcpServer = new CharlieMcpServer(options);
+    this.handler = createMcpHandler(this.mcpServer.toFactory(), options);
   }
 
   public fetch(
     request: Request,
-    options?: McpHandlerRequestOptions,
+    options?: CharlieMcpHttpFetchOptions,
   ): Promise<Response> {
-    return this.handler.fetch(request, options);
+    const { meta, ...rest } = options ?? {};
+    const dispatch = () => this.handler.fetch(request, rest);
+    return meta === undefined
+      ? dispatch()
+      : this.mcpServer.runWithMeta(meta, dispatch);
   }
 
   public async handle(
     req: IncomingMessage,
     res: ServerResponse,
+    options?: CharlieMcpHttpHandleOptions,
   ): Promise<void> {
     const parsedBody = (req as IncomingMessage & { body?: unknown }).body;
     // If body-parsing middleware already ran, req's stream is already
     // consumed — build a bodyless Request and forward parsedBody instead of
     // re-reading (and thereby throwing on) the now-disturbed stream.
-    const request = toWebRequest(req, parsedBody !== undefined);
-    const response = await this.fetch(
-      request,
-      parsedBody === undefined ? undefined : { parsedBody },
-    );
-    await writeWebResponse(response, res);
+    const request = this.toWebRequest(req, parsedBody !== undefined);
+    const response = await this.fetch(request, {
+      ...options,
+      ...(parsedBody === undefined ? {} : { parsedBody }),
+    });
+    await this.writeWebResponse(response, res);
   }
 
   public close(): Promise<void> {
     return this.handler.close();
   }
-}
 
-function toWebRequest(
-  req: IncomingMessage,
-  bodyAlreadyParsed: boolean,
-): Request {
-  const method = (req.method ?? "GET").toUpperCase();
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value === undefined) continue;
-    if (Array.isArray(value)) {
-      for (const item of value) headers.append(key, item);
-    } else {
-      headers.set(key, value);
+  private toWebRequest(
+    req: IncomingMessage,
+    bodyAlreadyParsed: boolean,
+  ): Request {
+    const method = (req.method ?? "GET").toUpperCase();
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (value === undefined) continue;
+      if (Array.isArray(value)) {
+        for (const item of value) headers.append(key, item);
+      } else {
+        headers.set(key, value);
+      }
     }
+    const host = req.headers.host ?? "localhost";
+    const protocol = (req.socket as { encrypted?: boolean }).encrypted
+      ? "https"
+      : "http";
+    const url = new URL(req.url ?? "/", `${protocol}://${host}`);
+    const hasBody = method !== "GET" && method !== "HEAD" && !bodyAlreadyParsed;
+    return hasBody
+      ? new Request(url, { method, headers, body: req, duplex: "half" })
+      : new Request(url, { method, headers });
   }
-  const host = req.headers.host ?? "localhost";
-  const protocol = (req.socket as { encrypted?: boolean }).encrypted
-    ? "https"
-    : "http";
-  const url = new URL(req.url ?? "/", `${protocol}://${host}`);
-  const hasBody = method !== "GET" && method !== "HEAD" && !bodyAlreadyParsed;
-  return hasBody
-    ? new Request(url, { method, headers, body: req, duplex: "half" })
-    : new Request(url, { method, headers });
-}
 
-async function writeWebResponse(
-  response: Response,
-  res: ServerResponse,
-): Promise<void> {
-  res.statusCode = response.status;
-  response.headers.forEach((value, key) => {
-    res.setHeader(key, value);
-  });
-  if (!response.body) {
-    res.end();
-    return;
-  }
-  const reader = response.body.getReader();
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(value);
+  private async writeWebResponse(
+    response: Response,
+    res: ServerResponse,
+  ): Promise<void> {
+    res.statusCode = response.status;
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+    if (!response.body) {
+      res.end();
+      return;
     }
-  } finally {
-    res.end();
+    const reader = response.body.getReader();
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    } finally {
+      res.end();
+    }
   }
 }

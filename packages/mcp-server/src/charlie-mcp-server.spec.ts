@@ -4,14 +4,14 @@ import {
 } from "@modelcontextprotocol/server";
 import { Client } from "@modelcontextprotocol/client";
 import { CharlieMcpServer } from "./charlie-mcp-server";
-import { EchoTool, FailingTool } from "./test-fixtures/echo-tool";
+import {
+  EchoTool,
+  FailingTool,
+  ProgressTool,
+  WhoAmITool,
+} from "./test-fixtures/echo-tool";
 
-async function connectClient(): Promise<Client> {
-  const mcpServer = new CharlieMcpServer({
-    tools: [new EchoTool(), new FailingTool()],
-    name: "charlie-mcp-server-test",
-    version: "0.0.0",
-  });
+async function connectWith(mcpServer: CharlieMcpServer): Promise<Client> {
   const server = mcpServer.toFactory()({} as McpRequestContext);
   const [clientTransport, serverTransport] =
     InMemoryTransport.createLinkedPair();
@@ -21,6 +21,16 @@ async function connectClient(): Promise<Client> {
     client.connect(clientTransport),
   ]);
   return client;
+}
+
+async function connectClient(): Promise<Client> {
+  return connectWith(
+    new CharlieMcpServer({
+      tools: [new EchoTool(), new FailingTool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+    }),
+  );
 }
 
 describe("CharlieMcpServer", () => {
@@ -87,6 +97,151 @@ describe("CharlieMcpServer", () => {
       await expect(
         client.callTool({ name: "does-not-exist", arguments: {} }),
       ).rejects.toThrow();
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("puts constructor meta on ChatAgentContext.meta", async () => {
+    const mcpServer = new CharlieMcpServer({
+      tools: [new WhoAmITool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+      meta: { tenant: "acme" },
+    });
+    const client = await connectWith(mcpServer);
+    try {
+      const result = await client.callTool({ name: "whoami", arguments: {} });
+      expect(result.content).toEqual([
+        { type: "text", text: JSON.stringify({ tenant: "acme" }) },
+      ]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("merges runWithMeta over constructor meta for a tools/call", async () => {
+    const mcpServer = new CharlieMcpServer({
+      tools: [new WhoAmITool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+      meta: { tenant: "acme" },
+    });
+    const client = await connectWith(mcpServer);
+    try {
+      const result = await mcpServer.runWithMeta({ user: { id: "ada" } }, () =>
+        client.callTool({ name: "whoami", arguments: {} }),
+      );
+      expect(result.content).toEqual([
+        {
+          type: "text",
+          text: JSON.stringify({ tenant: "acme", user: { id: "ada" } }),
+        },
+      ]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("forwards tools/call _meta onto ChatAgentContext.meta; host meta wins clashes", async () => {
+    const mcpServer = new CharlieMcpServer({
+      tools: [new WhoAmITool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+      meta: { tenant: "acme" },
+    });
+    const client = await connectWith(mcpServer);
+    try {
+      const result = await mcpServer.runWithMeta({ user: { id: "ada" } }, () =>
+        client.callTool({
+          name: "whoami",
+          arguments: {},
+          _meta: { traceId: "t1", user: { id: "mallory" } },
+        }),
+      );
+      expect(result.content).toEqual([
+        {
+          type: "text",
+          text: JSON.stringify({
+            tenant: "acme",
+            traceId: "t1",
+            user: { id: "ada" },
+          }),
+        },
+      ]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("forwards ToolProgress as notifications/progress when the client asks for progress", async () => {
+    const mcpServer = new CharlieMcpServer({
+      tools: [new ProgressTool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+    });
+    const client = await connectWith(mcpServer);
+    try {
+      const updates: { progress: number; message?: string }[] = [];
+      const result = await client.callTool(
+        {
+          name: "progress",
+          arguments: { messages: ["scanning", "found"] },
+        },
+        {
+          onprogress: (update) => {
+            updates.push({
+              progress: update.progress,
+              message: update.message,
+            });
+          },
+        },
+      );
+      expect(updates).toEqual([
+        { progress: 1, message: "scanning" },
+        { progress: 2, message: "found" },
+      ]);
+      expect(result.content).toEqual([{ type: "text", text: "{}" }]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("still returns a ToolProgress tool result when the client did not ask for progress", async () => {
+    const mcpServer = new CharlieMcpServer({
+      tools: [new ProgressTool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+    });
+    const client = await connectWith(mcpServer);
+    try {
+      const result = await client.callTool({
+        name: "progress",
+        arguments: { messages: ["scanning"] },
+      });
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toEqual([{ type: "text", text: "{}" }]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("does not put the MCP progressToken on ChatAgentContext.meta", async () => {
+    const mcpServer = new CharlieMcpServer({
+      tools: [new ProgressTool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+      meta: { tenant: "acme" },
+    });
+    const client = await connectWith(mcpServer);
+    try {
+      const result = await client.callTool(
+        { name: "progress", arguments: {} },
+        { onprogress: () => undefined },
+      );
+      expect(result.content).toEqual([
+        { type: "text", text: JSON.stringify({ tenant: "acme" }) },
+      ]);
     } finally {
       await client.close();
     }
