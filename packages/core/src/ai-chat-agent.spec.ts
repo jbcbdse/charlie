@@ -26,7 +26,7 @@ class CalculatorTool extends BaseTool {
       .string()
       .describe("A valid mathematical expression. Do not use variables."),
   });
-  public handler({ expr }: z.TypeOf<typeof this.schema>): string {
+  public handler({ expr }: z.infer<typeof this.schema>): string {
     expr = expr.replaceAll(/[^0-9+\-*/\s]/g, "");
     try {
       const ans = eval(expr).toString();
@@ -879,7 +879,7 @@ describe("AiChatAgent", () => {
       public schema = z.object({});
       public returnDirect = true;
       public handler(
-        _params: z.TypeOf<typeof this.schema>,
+        _params: z.infer<typeof this.schema>,
         context: ChatAgentContext,
       ): string {
         context.eventProducer.emit(EventName.ToolProgress, {
