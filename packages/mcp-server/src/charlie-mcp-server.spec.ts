@@ -102,6 +102,17 @@ describe("CharlieMcpServer", () => {
     }
   });
 
+  it("rejects duplicate tool names at construction", () => {
+    expect(
+      () =>
+        new CharlieMcpServer({
+          tools: [new EchoTool(), new EchoTool()],
+          name: "charlie-mcp-server-test",
+          version: "0.0.0",
+        }),
+    ).toThrow(/Duplicate tool name: echo/);
+  });
+
   it("puts constructor meta on ChatAgentContext.meta", async () => {
     const mcpServer = new CharlieMcpServer({
       tools: [new WhoAmITool()],
@@ -159,18 +170,64 @@ describe("CharlieMcpServer", () => {
           _meta: { traceId: "t1", user: { id: "mallory" } },
         }),
       );
+      expect(JSON.parse((result.content[0] as { text: string }).text)).toEqual({
+        tenant: "acme",
+        traceId: "t1",
+        user: { id: "ada" },
+      });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("does not let tools/call _meta overwrite constructor meta", async () => {
+    const mcpServer = new CharlieMcpServer({
+      tools: [new WhoAmITool()],
+      name: "charlie-mcp-server-test",
+      version: "0.0.0",
+      meta: { tenant: "acme" },
+    });
+    const client = await connectWith(mcpServer);
+    try {
+      const result = await client.callTool({
+        name: "whoami",
+        arguments: {},
+        _meta: { tenant: "mallory", traceId: "t1" },
+      });
       expect(result.content).toEqual([
         {
           type: "text",
-          text: JSON.stringify({
-            tenant: "acme",
-            traceId: "t1",
-            user: { id: "ada" },
-          }),
+          text: JSON.stringify({ tenant: "acme", traceId: "t1" }),
         },
       ]);
     } finally {
       await client.close();
+    }
+  });
+
+  it("keeps runWithMeta on one server from leaking into another", async () => {
+    const serverA = new CharlieMcpServer({
+      tools: [new WhoAmITool()],
+      name: "charlie-mcp-server-a",
+      version: "0.0.0",
+      meta: { server: "a" },
+    });
+    const serverB = new CharlieMcpServer({
+      tools: [new WhoAmITool()],
+      name: "charlie-mcp-server-b",
+      version: "0.0.0",
+      meta: { server: "b" },
+    });
+    const clientB = await connectWith(serverB);
+    try {
+      const result = await serverA.runWithMeta({ user: { id: "from-a" } }, () =>
+        clientB.callTool({ name: "whoami", arguments: {} }),
+      );
+      expect(result.content).toEqual([
+        { type: "text", text: JSON.stringify({ server: "b" }) },
+      ]);
+    } finally {
+      await clientB.close();
     }
   });
 

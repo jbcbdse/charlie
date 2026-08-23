@@ -42,10 +42,11 @@ export interface CharlieMcpServerOptions {
   instructions?: string;
   /**
    * Default `ChatAgentContext.meta` for every tools/call. Merge order is
-   * constructor `meta`, then the client's per-call `_meta`, then host
-   * `runWithMeta` / `CharlieMcpHttpHandler.handle` `meta` (host wins).
-   * Use constructor `meta` for process-wide values (stdio); put the
-   * authorized user on the HTTP handler per request, not here.
+   * the client's per-call `_meta`, then constructor `meta`, then host
+   * `runWithMeta` / `CharlieMcpHttpHandler.handle` `meta` (later wins).
+   * Clients cannot overwrite constructor or host keys. Use constructor
+   * `meta` for process-wide values (stdio); put the authorized user on
+   * the HTTP handler per request, not here.
    */
   meta?: ChatAgentContext["meta"];
   /**
@@ -74,15 +75,14 @@ export interface CharlieMcpServerOptions {
  * them (see `CharlieMcpStdioServer` / `CharlieMcpHttpHandler`).
  */
 export class CharlieMcpServer {
-  private static readonly metaStore = new AsyncLocalStorage<
+  private readonly metaStore = new AsyncLocalStorage<
     ChatAgentContext["meta"]
   >();
-
   private readonly toolsByName: Map<string, ITool>;
   private readonly eventProducer: EventProducer;
 
   constructor(private readonly options: CharlieMcpServerOptions) {
-    this.toolsByName = new Map(options.tools.map((tool) => [tool.name, tool]));
+    this.toolsByName = this.toolsByUniqueName(options.tools);
     this.eventProducer = options.eventProducer ?? defaultEventProducer;
   }
 
@@ -92,7 +92,7 @@ export class CharlieMcpServer {
    * `toFactory()` directly can too.
    */
   public runWithMeta<T>(meta: ChatAgentContext["meta"], fn: () => T): T {
-    return CharlieMcpServer.metaStore.run(meta, fn);
+    return this.metaStore.run(meta, fn);
   }
 
   public build(): Server {
@@ -136,10 +136,10 @@ export class CharlieMcpServer {
     requestMeta?: ChatAgentContext["meta"],
   ): ChatAgentContext["meta"] {
     return {
-      ...this.options.meta,
       ...requestMeta,
+      ...this.options.meta,
       ...ctx?.authInfo?.extra,
-      ...CharlieMcpServer.metaStore.getStore(),
+      ...this.metaStore.getStore(),
     };
   }
 
@@ -181,6 +181,17 @@ export class CharlieMcpServer {
     } finally {
       await stopForwarding?.();
     }
+  }
+
+  private toolsByUniqueName(tools: ITool[]): Map<string, ITool> {
+    const toolsByName = new Map<string, ITool>();
+    for (const tool of tools) {
+      if (toolsByName.has(tool.name)) {
+        throw new Error(`Duplicate tool name: ${tool.name}`);
+      }
+      toolsByName.set(tool.name, tool);
+    }
+    return toolsByName;
   }
 
   private progressTokenOf(

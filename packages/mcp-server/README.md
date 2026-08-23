@@ -110,8 +110,9 @@ down the underlying handler.
   this automatically if they pass `onprogress`. HTTP can upgrade that POST
   to SSE so the notifications arrive before the result. `Log` is not
   forwarded. `subscriptions/listen` is unused.
-- `context.meta` is the merge of constructor `meta`, the client's
-  per-call `_meta`, then host `meta` from `handle`/`fetch` (or
-  `runWithMeta`). Host keys win, so the authorized user must come from
-  the HTTP layer — do not trust `_meta` for auth. Initialize `clientInfo`
-  is still only the client app's `name`/`version`, not end-user identity.
+- `context.meta` is the merge of the client's per-call `_meta`, then
+  constructor `meta`, then host `meta` from `handle`/`fetch` (or
+  `runWithMeta`). Later keys win, so clients cannot overwrite constructor
+  or host values. The authorized user must come from the HTTP layer —
+  do not trust `_meta` for auth. Initialize `clientInfo` is still only
+  the client app's `name`/`version`, not end-user identity.

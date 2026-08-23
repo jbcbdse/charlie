@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import type { ChatAgentContext } from "@jbcbdse/charlie-core";
 import {
   createMcpHandler,
@@ -127,15 +129,6 @@ export class CharlieMcpHttpHandler {
       res.end();
       return;
     }
-    const reader = response.body.getReader();
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        res.write(value);
-      }
-    } finally {
-      res.end();
-    }
+    await pipeline(Readable.fromWeb(response.body), res);
   }
 }
