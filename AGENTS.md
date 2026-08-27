@@ -18,10 +18,11 @@ packages/
   google/          — GeminiExecutor                                     (@jbcbdse/charlie-google)
   datadog/         — LlmSpansApi (subscribes to events, sends spans)   (@jbcbdse/charlie-datadog)
   mcp/             — MCP client: tools as ITool, resource/prompt APIs  (@jbcbdse/charlie-mcp)
+  mcp-server/      — MCP server: expose ITool[] as tools/list+call     (@jbcbdse/charlie-mcp-server)
   examples/        — REPL, HTTP server, e2e tests (not published)
 ```
 
-Dependency graph: everything depends on `core`. `datadog` and `mcp` depend only on `core`. `examples` depends on all packages. Build order matters: build `core` before anything else.
+Dependency graph: everything depends on `core`. `datadog`, `mcp`, and `mcp-server` depend only on `core`. `examples` depends on all packages. Build order matters: build `core` before anything else.
 
 ## Key concepts
 
@@ -72,6 +73,8 @@ Executors always use the provider stream API and map vendor parts into a common 
 **preRunTransformers** run once before the first executor call. They return the messages to send and may replace `context.tools` (a mutable copy of the `getResponse` tools). Use this to filter a large tool list or rewrite incoming messages without wrapping every `getResponse` call. `preToolCallTransformers` / `postToolCallTransformers` / `postRunTransformers` still process LLM output around tool execution.
 
 **MCP** (`@jbcbdse/charlie-mcp`) is a client adapter, not an executor. `McpSessions.connect` talks to stdio or Streamable HTTP servers. MCP tools become `ITool[]` for `getResponse`. Resources (`listResources` / `readResource`) and prompts (`listPrompts` / `getPrompt` → `ChatMessage[]`) are caller APIs — `AiChatAgent` never sees them. The REPL/server load servers from `MCP_CONFIG` if set.
+
+**MCP server** (`@jbcbdse/charlie-mcp-server`) is the reverse: it exposes Charlie `ITool[]` as an MCP server, so an external MCP client can call them. Three classes, each constructed with an options object (`tools`, `name`, `version`, plus transport options) so an instance can be handed straight to a DI container. `CharlieMcpServer` wraps the SDK's low-level `Server` (not `McpServer` — Charlie's `ITool.jsonSchema` is already JSON Schema, and not every `ITool` has a Zod schema) and exposes `toFactory()` for the SDK's factory-shaped transports. `CharlieMcpStdioServer.serve()` wraps stdio; `CharlieMcpHttpHandler` wraps a Web-standard `fetch` handler and its `handle(req, res)` method bridges Node's classic request/response shape, which is what makes an instance mountable as an Express route or injectable into a NestJS controller on the Express platform. `examples`' server mounts one at `POST/GET/DELETE /mcp`. A tool that emits `ToolProgress` is forwarded to the MCP client as `notifications/progress` on that same `tools/call` when the client sent a `progressToken` (`onprogress` on the SDK client).
 
 **Events** use a singleton `eventProducer` (from `core`). Executors call `this.eventProducer.emit(EventName.X, ...)`. Consumers subscribe via `events.on(EventName.X, handler)`, the typed `EventSubscriber` class, or `ChatRun.on` (run-scoped). The `datadog` package is implemented entirely as an event subscriber — it never touches the executor. Stream chunks use the same bus; a global subscriber must still filter by `requestId` / `runId`.
 

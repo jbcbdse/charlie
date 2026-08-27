@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from "zod";
-import zodToJsonSchema from "zod-to-json-schema";
 import { ChatAgentContext } from "./types";
 
 /**
@@ -29,7 +28,7 @@ export abstract class BaseTool implements ITool {
   public abstract schema: z.ZodType;
   public returnDirect = false;
   public get jsonSchema(): any {
-    return zodToJsonSchema(this.schema);
+    return z.toJSONSchema(this.schema, { target: "draft-07", io: "input" });
   }
   /**
    * This method should be called by the executor and performs validation

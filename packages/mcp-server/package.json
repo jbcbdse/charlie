@@ -1,7 +1,7 @@
 {
-  "name": "@jbcbdse/charlie-core",
+  "name": "@jbcbdse/charlie-mcp-server",
   "version": "0.5.0",
-  "description": "",
+  "description": "Expose Charlie ITool[] as an MCP server: transport-agnostic factory plus stdio, Web-standard HTTP, and Node req/res adapters",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jbcbdse/charlie.git"
@@ -24,13 +24,12 @@
   },
   "author": "Jonathan Barnett",
   "license": "MIT",
-  "devDependencies": {
-    "@types/lodash.get": "^4.4.9"
-  },
   "dependencies": {
-    "lodash.get": "^4.4.2",
-    "uuid": "^10.0.0",
-    "yaml": "^2.5.0",
+    "@jbcbdse/charlie-core": "^0.5.0",
+    "@modelcontextprotocol/server": "^2.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
     "zod": "^4.2.0"
   }
 }

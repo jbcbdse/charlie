@@ -11,7 +11,7 @@ export class DeleteAccountTool extends BaseTool {
         "Whether the user has indicated in at least two messages that they want to delete their account",
       ),
   });
-  public handler({ userIsCertain }: z.TypeOf<typeof this.schema>): string {
+  public handler({ userIsCertain }: z.infer<typeof this.schema>): string {
     if (userIsCertain) {
       return "The user's account has been deleted";
     }

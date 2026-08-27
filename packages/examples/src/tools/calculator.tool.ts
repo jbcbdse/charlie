@@ -11,7 +11,7 @@ export class CalculatorTool extends BaseTool {
       .string()
       .describe("A valid mathematical expression. Do not use variables."),
   });
-  public handler({ expr }: z.TypeOf<typeof this.schema>): string {
+  public handler({ expr }: z.infer<typeof this.schema>): string {
     try {
       const result = new Parser().parse(expr).evaluate().toString();
       return `${expr} = ${result}`;

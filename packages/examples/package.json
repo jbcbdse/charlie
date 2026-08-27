@@ -24,12 +24,16 @@
     "@jbcbdse/charlie-datadog": "^0.5.0",
     "@jbcbdse/charlie-google": "^0.5.0",
     "@jbcbdse/charlie-mcp": "^0.5.0",
+    "@jbcbdse/charlie-mcp-server": "^0.5.0",
     "@jbcbdse/charlie-ollama": "^0.5.0",
     "@jbcbdse/charlie-openai": "^0.5.0",
     "@types/express": "^5.0.6",
     "dotenv": "^16.4.7",
     "expr-eval": "^2.0.2",
     "express": "^5.2.1",
-    "zod": "^3.23.8"
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0"
   }
 }

@@ -13,7 +13,7 @@ export class DirectBirthdayTool extends BaseTool {
     day: z.number().describe("The day of the user's birthday"),
   });
   public returnDirect = true;
-  public handler({ year, month, day }: z.TypeOf<typeof this.schema>): string {
+  public handler({ year, month, day }: z.infer<typeof this.schema>): string {
     return `Your birthday has been set to ${year}-${month}-${day}. (Direct tool response example)`;
   }
 }
