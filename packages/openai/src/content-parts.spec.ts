@@ -1,4 +1,4 @@
-import { toOpenAiContent, toResponsesContent } from "./content-parts";
+import { parseDataUrl, toOpenAiContent, toResponsesContent } from "./content-parts";
 
 const pngB64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
@@ -41,5 +41,15 @@ describe("toResponsesContent", () => {
         detail: "auto",
       },
     ]);
+  });
+});
+
+describe("parseDataUrl", () => {
+  it("parses a data URL and rejects remote URLs", () => {
+    expect(parseDataUrl(`data:image/jpeg;base64,${pngB64}`)).toEqual({
+      mimeType: "image/jpeg",
+      data: pngB64,
+    });
+    expect(parseDataUrl("https://example.com/a.png")).toBeUndefined();
   });
 });

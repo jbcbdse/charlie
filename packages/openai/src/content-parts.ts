@@ -14,6 +14,10 @@ function isOpenAiFileMime(mimeType: string): boolean {
   return mimeType.toLowerCase() === "application/pdf";
 }
 
+export function isOpenAiNativeMime(mimeType: string): boolean {
+  return isImageMimeType(mimeType) || isOpenAiFileMime(mimeType);
+}
+
 export function toOpenAiContent(
   text: string,
   attachments?: Attachment[],

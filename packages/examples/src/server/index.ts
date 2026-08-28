@@ -218,7 +218,7 @@ const localTools = [
 const availableAgents = Object.keys(agents) as AvailableAgent[];
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 async function start() {
   const mcp = await loadOptionalMcp();

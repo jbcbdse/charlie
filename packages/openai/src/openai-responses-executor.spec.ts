@@ -411,4 +411,69 @@ describe("OpenAiResponsesExecutor", () => {
       },
     ]);
   });
+
+  it("sends tool attachments as function_call_output text plus a follow-up user image", async () => {
+    const create = jest.fn().mockResolvedValue(
+      completedStream({
+        output: [{ type: "message", content: [{ type: "output_text", text: "ok" }] }],
+      }),
+    );
+    const executor = new OpenAiResponsesExecutor({
+      modelId: "gpt-5.4",
+      openAiClient: { responses: { create } } as unknown as OpenAI,
+    });
+    await executor.execute({
+      context: context(),
+      messages: [
+        { role: "user", content: "pic" },
+        {
+          role: "tool_call",
+          toolCalls: [
+            {
+              id: "t1",
+              type: "function",
+              function: { name: "shot", arguments: {} },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          name: "shot",
+          toolCallId: "t1",
+          content: "done",
+          returnDirect: false,
+          status: "success",
+          attachments: [{ mimeType: "image/png", data: "BBBB" }],
+        },
+      ],
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: [
+          { role: "user", content: "pic" },
+          {
+            type: "function_call",
+            call_id: "t1",
+            name: "shot",
+            arguments: "{}",
+          },
+          {
+            type: "function_call_output",
+            call_id: "t1",
+            output: "done\n[attachment image/png]",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "input_image",
+                image_url: "data:image/png;base64,BBBB",
+                detail: "auto",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  });
 });

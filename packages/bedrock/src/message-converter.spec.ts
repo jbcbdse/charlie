@@ -32,4 +32,44 @@ describe("MessageConverter attachments", () => {
     ]);
     expect(message.content).toEqual([{ text: "hi\n[attachment audio/wav]" }]);
   });
+
+  it("uses unique alphanumeric names for document blocks", () => {
+    const [message] = converter.toBedrockMessages([
+      {
+        role: "user",
+        content: "read",
+        attachments: [
+          {
+            mimeType: "application/pdf",
+            data: "AAAA",
+            name: "report.pdf",
+          },
+          {
+            mimeType: "application/pdf",
+            data: "BBBB",
+            name: "other file.pdf",
+          },
+        ],
+      },
+    ]);
+    expect(message.content?.[1]?.document?.name).toMatch(/^document\d+$/);
+    expect(message.content?.[2]?.document?.name).toMatch(/^document\d+$/);
+    expect(message.content?.[1]?.document?.name).not.toBe(
+      message.content?.[2]?.document?.name,
+    );
+  });
+
+  it("does not send image blocks on assistant turns", () => {
+    const [message] = converter.toBedrockMessages([
+      {
+        role: "assistant",
+        content: "see",
+        attachments: [{ mimeType: "image/png", data: pngB64 }],
+      },
+    ]);
+    expect(message.role).toBe("assistant");
+    expect(message.content).toEqual([
+      { text: "see\n[attachment image/png]" },
+    ]);
+  });
 });

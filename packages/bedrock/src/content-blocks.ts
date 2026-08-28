@@ -30,9 +30,11 @@ const DOCUMENT_FORMATS: Record<
   "text/markdown": "md",
 };
 
-function documentName(attachment: Attachment): string {
-  const raw = (attachment.name ?? "document").replace(/[^a-zA-Z0-9._-]/g, "_");
-  return raw || "document";
+let documentSeq = 0;
+
+function documentName(): string {
+  documentSeq += 1;
+  return `document${documentSeq}`;
 }
 
 export function toBedrockContentBlocks(
@@ -58,7 +60,7 @@ export function toBedrockContentBlocks(
       blocks.push({
         document: {
           format: documentFormat,
-          name: documentName(attachment),
+          name: documentName(),
           source: { bytes: attachmentBytes(attachment) },
         },
       });

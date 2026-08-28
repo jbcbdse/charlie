@@ -52,7 +52,7 @@ interface ChatResponse {
 }
 
 function isModelUnavailable(error?: string): boolean {
-  return /not available for this account|permission_error|access_denied|access denied|legacy|UnrecognizedClient|ExpiredToken|InvalidClientTokenId|Unauthorized|does(?: not|n't) support.{0,80}image|image content block|does not support image modality|image (is )?not supported|unsupported.*image|invalid.*image|ValidationException|can(?:not|'t) process.*image|could not process image|unable to process.{0,40}image|partId|modality|Sorry about that/i.test(
+  return /not available for this account|permission_error|access_denied|access denied|legacy|UnrecognizedClient|ExpiredToken|InvalidClientTokenId|Unauthorized|does(?: not|n't) support.{0,80}image|image content block|does not support image modality/i.test(
     error ?? "",
   );
 }
@@ -72,9 +72,6 @@ async function chat(agent: string): Promise<{
     }),
   });
   const data = (await res.json()) as ChatResponse;
-  if (res.status >= 500 && data.error && !isModelUnavailable(data.error)) {
-    throw new Error(`Server ${res.status}: ${data.error}`);
-  }
   return { status: res.status, data };
 }
 
@@ -108,13 +105,12 @@ describe("Attachment vision input", () => {
         return;
       }
       const { status, data } = await chat(agent);
-      if (status >= 400 && isModelUnavailable(data.error)) {
-        console.warn(`Skipping ${agent} attachment e2e: ${data.error}`);
-        return;
-      }
-      if (NO_VISION.has(agent)) {
+      if (
+        NO_VISION.has(agent) ||
+        (status >= 400 && isModelUnavailable(data.error))
+      ) {
         console.warn(
-          `Skipping ${agent} attachment e2e: model has no image input`,
+          `Skipping ${agent} attachment e2e: ${data.error ?? "no image input"}`,
         );
         return;
       }

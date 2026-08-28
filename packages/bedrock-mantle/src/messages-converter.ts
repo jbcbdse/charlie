@@ -3,6 +3,7 @@ import {
   attachmentBase64,
   ChatMessage,
   MessageToolCall,
+  messageTextWithPlaceholders,
   textWithUnsupportedAttachments,
 } from "@jbcbdse/charlie-core";
 
@@ -121,9 +122,10 @@ export class MantleMessagesConverter {
       }
       if (msg.role === "assistant") {
         flushToolResults();
-        assistantBlocks.push(
-          ...this.toMediaBlocks(msg.content, msg.attachments),
-        );
+        const text = messageTextWithPlaceholders(msg);
+        if (text) {
+          assistantBlocks.push({ type: "text", text });
+        }
         continue;
       }
       if (msg.role === "tool_call") {

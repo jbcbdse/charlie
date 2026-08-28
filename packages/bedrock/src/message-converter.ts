@@ -1,4 +1,4 @@
-import { ChatMessage } from "@jbcbdse/charlie-core";
+import { ChatMessage, messageTextWithPlaceholders } from "@jbcbdse/charlie-core";
 import { ContentBlock, Message } from "@aws-sdk/client-bedrock-runtime";
 import { toBedrockContentBlocks } from "./content-blocks";
 
@@ -31,7 +31,9 @@ export class MessageConverter {
     if (msg.role === "assistant") {
       return {
         role: "assistant",
-        content: toBedrockContentBlocks(msg.content, msg.attachments),
+        content: toBedrockContentBlocks(
+          messageTextWithPlaceholders(msg),
+        ),
       };
     }
     if (msg.role === "tool_call") {

@@ -10,13 +10,13 @@ interface OpenAiUserMessage {
 }
 interface OpenAiAssistantMessage {
   role: "assistant";
-  content: string | OpenAiContentPart[] | null;
+  content: string | null;
   name?: string;
   tool_calls?: OpenAiAssistantToolCall[];
 }
 interface OpenAiToolMessage {
   role: "tool";
-  content: string | OpenAiContentPart[];
+  content: string;
   tool_call_id: string;
 }
 type OpenAiContentPart =

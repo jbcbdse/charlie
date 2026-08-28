@@ -8,9 +8,15 @@ import {
   CharlieStreamConsumer,
   CharlieStreamPart,
   ToolChoice,
+  messageTextWithPlaceholders,
+  type Attachment,
 } from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutorOptions } from "./openai-chat-executor";
-import { toResponsesContent } from "./content-parts";
+import {
+  isOpenAiNativeMime,
+  parseDataUrl,
+  toResponsesContent,
+} from "./content-parts";
 
 export type OpenAiResponsesExecutorOptions = OpenAiChatExecutorOptions & {
   maxOutputTokens?: number;
@@ -226,18 +232,26 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
               }
             ).content;
             for (const part of content ?? []) {
-              if (
-                (part.type === "output_image" || part.type === "image") &&
-                (part.result || part.image_url)
-              ) {
-                const data = part.result ?? part.image_url;
-                if (data) {
-                  yield {
-                    type: "attachment",
-                    mimeType: "image/png",
-                    data,
-                  };
-                }
+              if (part.type !== "output_image" && part.type !== "image") {
+                continue;
+              }
+              if (part.result) {
+                yield {
+                  type: "attachment",
+                  mimeType: "image/png",
+                  data: part.result,
+                };
+                continue;
+              }
+              const parsed = part.image_url
+                ? parseDataUrl(part.image_url)
+                : undefined;
+              if (parsed) {
+                yield {
+                  type: "attachment",
+                  mimeType: parsed.mimeType,
+                  data: parsed.data,
+                };
               }
             }
           }
@@ -248,6 +262,7 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
 
   private toInputItems(messages: ChatMessage[]): ResponseInputItem[] {
     const items: ResponseInputItem[] = [];
+    const deferred: Attachment[] = [];
     for (const msg of messages) {
       if (msg.role === "user") {
         items.push({
@@ -263,8 +278,8 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       if (msg.role === "assistant") {
         items.push({
           role: "assistant",
-          content: toResponsesContent(msg.content, msg.attachments),
-        } as ResponseInputItem);
+          content: messageTextWithPlaceholders(msg),
+        });
         continue;
       }
       if (msg.role === "reasoning") {
@@ -292,12 +307,23 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
         items.push({
           type: "function_call_output",
           call_id: msg.toolCallId,
-          output: toResponsesContent(msg.content, msg.attachments),
-        } as ResponseInputItem);
+          output: messageTextWithPlaceholders(msg),
+        });
+        deferred.push(
+          ...(msg.attachments ?? []).filter((a) =>
+            isOpenAiNativeMime(a.mimeType),
+          ),
+        );
         continue;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       throw new Error(`Unknown message role: ${(msg as any)?.role}`);
+    }
+    if (deferred.length) {
+      items.push({
+        role: "user",
+        content: toResponsesContent("", deferred),
+      } as ResponseInputItem);
     }
     return items;
   }

@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { OpenAiChatMessage, OpenAiCompletionsRequest } from "./types";
 import {
+  Attachment,
   ChatExecutor,
   ChatAgentGetResponseOutput,
   ChatMessage,
@@ -10,8 +11,13 @@ import {
   CharlieStreamConsumer,
   CharlieStreamPart,
   ToolChoice,
+  messageTextWithPlaceholders,
 } from "@jbcbdse/charlie-core";
-import { toOpenAiContent, parseDataUrl } from "./content-parts";
+import {
+  isOpenAiNativeMime,
+  parseDataUrl,
+  toOpenAiContent,
+} from "./content-parts";
 
 export interface OpenAiChatExecutorOptions {
   modelProvider?: string;
@@ -195,53 +201,68 @@ export class OpenAiChatExecutor implements ChatExecutor {
   }
 
   private toOpenAiMessages(messages: ChatMessage[]): OpenAiChatMessage[] {
-    return messages
-      .filter((msg) => msg.role !== "reasoning")
-      .map((msg) => {
-        if (msg.role === "user") {
-          return {
-            role: "user",
-            content: toOpenAiContent(msg.content, msg.attachments),
-            name: msg.name,
-          };
-        }
-        if (msg.role === "system") {
-          return {
-            role: "system",
-            content: msg.content,
-            name: msg.name,
-          };
-        }
-        if (msg.role === "tool_call") {
-          return {
-            role: "assistant",
-            content: "",
-            tool_calls: msg.toolCalls.map((toolCall) => ({
-              id: toolCall.id,
-              type: "function",
-              function: {
-                name: toolCall.function.name,
-                arguments: JSON.stringify(toolCall.function.arguments),
-              },
-            })),
-          };
-        }
-        if (msg.role === "assistant") {
-          return {
-            role: "assistant",
-            content: toOpenAiContent(msg.content, msg.attachments),
-            name: msg.name,
-          };
-        }
-        if (msg.role === "tool") {
-          return {
-            role: "tool",
-            content: toOpenAiContent(msg.content, msg.attachments),
-            tool_call_id: msg.toolCallId,
-          };
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        throw new Error(`Unknown message role: ${(msg as any)?.role}`);
-      });
+    const out: OpenAiChatMessage[] = [];
+    const deferred: Attachment[] = [];
+    for (const msg of messages) {
+      if (msg.role === "reasoning") continue;
+      if (msg.role === "user") {
+        out.push({
+          role: "user",
+          content: toOpenAiContent(msg.content, msg.attachments),
+          name: msg.name,
+        });
+        continue;
+      }
+      if (msg.role === "system") {
+        out.push({
+          role: "system",
+          content: msg.content,
+          name: msg.name,
+        });
+        continue;
+      }
+      if (msg.role === "tool_call") {
+        out.push({
+          role: "assistant",
+          content: "",
+          tool_calls: msg.toolCalls.map((toolCall) => ({
+            id: toolCall.id,
+            type: "function",
+            function: {
+              name: toolCall.function.name,
+              arguments: JSON.stringify(toolCall.function.arguments),
+            },
+          })),
+        });
+        continue;
+      }
+      if (msg.role === "assistant") {
+        out.push({
+          role: "assistant",
+          content: messageTextWithPlaceholders(msg),
+          name: msg.name,
+        });
+        continue;
+      }
+      if (msg.role === "tool") {
+        out.push({
+          role: "tool",
+          content: messageTextWithPlaceholders(msg),
+          tool_call_id: msg.toolCallId,
+        });
+        deferred.push(
+          ...(msg.attachments ?? []).filter((a) =>
+            isOpenAiNativeMime(a.mimeType),
+          ),
+        );
+        continue;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      throw new Error(`Unknown message role: ${(msg as any)?.role}`);
+    }
+    if (deferred.length) {
+      out.push({ role: "user", content: toOpenAiContent("", deferred) });
+    }
+    return out;
   }
 }

@@ -174,4 +174,21 @@ describe("MantleMessagesConverter", () => {
       },
     ]);
   });
+
+  it("sends assistant attachments as text placeholders", () => {
+    expect(
+      converter.toMessages([
+        {
+          role: "assistant",
+          content: "see",
+          attachments: [{ mimeType: "image/png", data: "AAAA" }],
+        },
+      ]),
+    ).toEqual([
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "see\n[attachment image/png]" }],
+      },
+    ]);
+  });
 });
