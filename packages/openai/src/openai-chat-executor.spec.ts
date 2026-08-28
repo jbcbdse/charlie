@@ -339,4 +339,66 @@ describe("OpenAiChatExecutor streaming", () => {
       }),
     );
   });
+
+  it("maps user image attachments onto the request and stream image parts into history", async () => {
+    const producer = new EventProducer();
+    const create = jest.fn().mockResolvedValue(
+      asyncChunks([
+        {
+          choices: [
+            {
+              delta: {
+                content: [
+                  { type: "text", text: "ok" },
+                  {
+                    type: "image_url",
+                    image_url: { url: "data:image/png;base64,AAAA" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ]),
+    );
+    const executor = new OpenAiChatExecutor({
+      modelId: "test-model",
+      openAiClient: {
+        chat: { completions: { create } },
+      } as never,
+    });
+    const result = await executor.execute({
+      messages: [
+        {
+          role: "user",
+          content: "look",
+          attachments: [{ mimeType: "image/png", data: "AAAA" }],
+        },
+      ],
+      context: context(producer),
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "look" },
+              {
+                type: "image_url",
+                image_url: { url: "data:image/png;base64,AAAA" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.responseMessages).toEqual([
+      {
+        role: "assistant",
+        content: "ok",
+        attachments: [{ mimeType: "image/png", data: "AAAA" }],
+      },
+    ]);
+  });
 });

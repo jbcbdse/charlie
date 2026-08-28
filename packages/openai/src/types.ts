@@ -5,21 +5,24 @@ interface OpenAiSystemMessage {
 }
 interface OpenAiUserMessage {
   role: "user";
-  /** OpenAI supports a more complex array of content parts where each part can be an object representing text or an image URL. Those are not implemented here */
-  content: string;
+  content: string | OpenAiContentPart[];
   name?: string;
 }
 interface OpenAiAssistantMessage {
   role: "assistant";
-  content: string | null;
+  content: string | OpenAiContentPart[] | null;
   name?: string;
   tool_calls?: OpenAiAssistantToolCall[];
 }
 interface OpenAiToolMessage {
   role: "tool";
-  content: string;
+  content: string | OpenAiContentPart[];
   tool_call_id: string;
 }
+type OpenAiContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } }
+  | { type: "file"; file: { filename?: string; file_data: string } };
 interface OpenAiAssistantToolCall {
   id: string;
   type: "function";

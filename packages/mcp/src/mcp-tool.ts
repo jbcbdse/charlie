@@ -3,8 +3,9 @@ import {
   EventName,
   type ChatAgentContext,
   type ITool,
+  type ToolResult,
 } from "@jbcbdse/charlie-core";
-import { flattenMcpContent } from "./mcp-content";
+import { mcpContentToCharlie } from "./mcp-content";
 
 interface McpToolDefinition {
   name: string;
@@ -30,7 +31,7 @@ export class McpTool implements ITool {
   public async handle(
     params: unknown,
     context: ChatAgentContext,
-  ): Promise<string> {
+  ): Promise<ToolResult> {
     const result = await this.client.callTool(
       {
         name: this.definition.name,
@@ -51,12 +52,20 @@ export class McpTool implements ITool {
         resetTimeoutOnProgress: true,
       },
     );
-    let text = flattenMcpContent(result.content);
-    if (!text && result.structuredContent !== undefined) {
+    const mapped = mcpContentToCharlie(result.content);
+    let text = mapped.content;
+    if (
+      !text &&
+      !mapped.attachments &&
+      result.structuredContent !== undefined
+    ) {
       text = JSON.stringify(result.structuredContent);
     }
     if (result.isError) {
       throw new Error(text || `MCP tool ${this.definition.name} failed`);
+    }
+    if (mapped.attachments) {
+      return { content: text, attachments: mapped.attachments };
     }
     return text;
   }

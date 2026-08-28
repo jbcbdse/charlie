@@ -24,7 +24,7 @@ type AnthropicBlock<T extends ContentBlock["type"]> = Extract<
 
 /** Anthropic Messages {@link ContentBlock} as assembled from stream events. */
 interface AnthropicContentBlock {
-  type: ContentBlock["type"];
+  type: string;
   text?: AnthropicBlock<"text">["text"];
   thinking?: AnthropicBlock<"thinking">["thinking"];
   signature?: AnthropicBlock<"thinking">["signature"];
@@ -33,6 +33,7 @@ interface AnthropicContentBlock {
   input?: AnthropicBlock<"tool_use">["input"];
   data?: AnthropicBlock<"redacted_thinking">["data"];
   inputJson?: string;
+  source?: { media_type?: string; data?: string };
 }
 
 export type BedrockMantleMessagesExecutorOptions = MantleAuthOptions & {
@@ -174,6 +175,13 @@ export class BedrockMantleMessagesExecutor implements ChatExecutor {
         }
         if (block?.type === "redacted_thinking" && block.data) {
           yield { type: "reasoning", signature: block.data };
+        }
+        if (block?.type === "image" && block.source?.data) {
+          yield {
+            type: "attachment",
+            mimeType: block.source.media_type ?? "image/png",
+            data: block.source.data,
+          };
         }
       }
       if (part.type === "content_block_delta") {

@@ -10,6 +10,7 @@ import {
   ToolChoice,
 } from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutorOptions } from "./openai-chat-executor";
+import { toResponsesContent } from "./content-parts";
 
 export type OpenAiResponsesExecutorOptions = OpenAiChatExecutorOptions & {
   maxOutputTokens?: number;
@@ -204,6 +205,42 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
               argumentsText: item.arguments,
             };
           }
+          if (item.type === "image_generation_call") {
+            const result = (item as { result?: string }).result;
+            if (result) {
+              yield {
+                type: "attachment",
+                mimeType: "image/png",
+                data: result,
+              };
+            }
+          }
+          if (item.type === "message") {
+            const content = (
+              item as {
+                content?: {
+                  type?: string;
+                  image_url?: string;
+                  result?: string;
+                }[];
+              }
+            ).content;
+            for (const part of content ?? []) {
+              if (
+                (part.type === "output_image" || part.type === "image") &&
+                (part.result || part.image_url)
+              ) {
+                const data = part.result ?? part.image_url;
+                if (data) {
+                  yield {
+                    type: "attachment",
+                    mimeType: "image/png",
+                    data,
+                  };
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -213,7 +250,10 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
     const items: ResponseInputItem[] = [];
     for (const msg of messages) {
       if (msg.role === "user") {
-        items.push({ role: "user", content: msg.content });
+        items.push({
+          role: "user",
+          content: toResponsesContent(msg.content, msg.attachments),
+        } as ResponseInputItem);
         continue;
       }
       if (msg.role === "system") {
@@ -221,7 +261,10 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
         continue;
       }
       if (msg.role === "assistant") {
-        items.push({ role: "assistant", content: msg.content });
+        items.push({
+          role: "assistant",
+          content: toResponsesContent(msg.content, msg.attachments),
+        } as ResponseInputItem);
         continue;
       }
       if (msg.role === "reasoning") {
@@ -249,8 +292,8 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
         items.push({
           type: "function_call_output",
           call_id: msg.toolCallId,
-          output: msg.content,
-        });
+          output: toResponsesContent(msg.content, msg.attachments),
+        } as ResponseInputItem);
         continue;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

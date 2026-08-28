@@ -1,4 +1,4 @@
-import { ITool } from "./base-tool";
+import { ITool, normalizeToolResult } from "./base-tool";
 import { EventName } from "./event-producer";
 import { ChatAgentContext, MessageTool, MessageToolCall } from "./types";
 
@@ -39,14 +39,18 @@ export class ToolExecutor {
             toolCall.function.arguments,
             this.withTool(context, tool.name, toolCall.id),
           )
-          .then((toolResult) => ({
-            role: "tool" as const,
-            content: toolResult,
-            toolCallId: toolCall.id,
-            name: tool.name,
-            status: "success" as const,
-            returnDirect: tool.returnDirect || false,
-          }))
+          .then((toolResult) => {
+            const { content, attachments } = normalizeToolResult(toolResult);
+            return {
+              role: "tool" as const,
+              content,
+              ...(attachments ? { attachments } : {}),
+              toolCallId: toolCall.id,
+              name: tool.name,
+              status: "success" as const,
+              returnDirect: tool.returnDirect || false,
+            };
+          })
           .catch((err) => ({
             role: "tool" as const,
             content: `Error in tool ${tool.name}: ${err.message}`,

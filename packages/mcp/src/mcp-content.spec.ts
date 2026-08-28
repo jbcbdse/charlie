@@ -1,4 +1,8 @@
-import { flattenMcpContent, mcpPromptToChatMessages } from "./mcp-content";
+import {
+  flattenMcpContent,
+  mcpContentToCharlie,
+  mcpPromptToChatMessages,
+} from "./mcp-content";
 
 describe("flattenMcpContent", () => {
   it("joins text blocks", () => {
@@ -30,6 +34,20 @@ describe("flattenMcpContent", () => {
   });
 });
 
+describe("mcpContentToCharlie", () => {
+  it("keeps image bytes as attachments", () => {
+    expect(
+      mcpContentToCharlie([
+        { type: "text", text: "see" },
+        { type: "image", mimeType: "image/png", data: "AAAA" },
+      ]),
+    ).toEqual({
+      content: "see",
+      attachments: [{ mimeType: "image/png", data: "AAAA" }],
+    });
+  });
+});
+
 describe("mcpPromptToChatMessages", () => {
   it("maps user and assistant prompt messages", () => {
     expect(
@@ -46,6 +64,26 @@ describe("mcpPromptToChatMessages", () => {
     ).toEqual([
       { role: "user", content: "Review this" },
       { role: "assistant", content: "ok" },
+    ]);
+  });
+
+  it("maps prompt image blocks onto message attachments", () => {
+    expect(
+      mcpPromptToChatMessages([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "look" },
+            { type: "image", mimeType: "image/png", data: "AAAA" },
+          ],
+        },
+      ]),
+    ).toEqual([
+      {
+        role: "user",
+        content: "look",
+        attachments: [{ mimeType: "image/png", data: "AAAA" }],
+      },
     ]);
   });
 });

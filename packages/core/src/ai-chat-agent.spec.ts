@@ -147,6 +147,52 @@ describe("AiChatAgent", () => {
       expect(responseMessage.content).toBe("pong");
       expect(response.responseMessages).toMatchSnapshot();
     });
+    it("copies tool attachments onto the returnDirect assistant message", async () => {
+      class ImagePingTool extends BaseTool {
+        public name = "ImagePingTool";
+        public description = "Returns an image";
+        public returnDirect = true;
+        public schema = z.object({});
+        public handler() {
+          return {
+            content: "here",
+            attachments: [{ mimeType: "image/png", data: "AAAA" }],
+          };
+        }
+      }
+      class ImagePingExecutor implements ChatExecutor {
+        modelId = "mock-model-id";
+        modelProvider = "mock-model-provider";
+        async execute(): Promise<ChatAgentGetResponseOutput> {
+          const responseMessage: ChatMessage = {
+            role: "tool_call",
+            toolCalls: [
+              {
+                function: { name: "ImagePingTool", arguments: {} },
+                id: "img-1",
+                type: "function",
+              },
+            ],
+          };
+          return {
+            responseMessage,
+            responseMessages: [responseMessage],
+          };
+        }
+      }
+      const localAgent = new AiChatAgent({
+        chatExecutor: new ImagePingExecutor(),
+      });
+      const response = await localAgent.getResponse({
+        messages: [{ role: "user", content: "pic" }],
+        tools: [new ImagePingTool()],
+      });
+      expect(response.responseMessage).toEqual({
+        role: "assistant",
+        content: "here",
+        attachments: [{ mimeType: "image/png", data: "AAAA" }],
+      });
+    });
     it("lets a preRun transformer filter tools and mutate messages before execute", async () => {
       const keep = new PingPongTool();
       const drop = new CalculatorTool();

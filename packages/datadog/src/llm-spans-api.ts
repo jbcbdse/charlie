@@ -8,6 +8,7 @@ import {
   EventChatExecutorEnd,
   EventChatStart,
   EventToolEnd,
+  messageTextWithPlaceholders,
 } from "@jbcbdse/charlie-core";
 import { v4 as uuid } from "uuid";
 
@@ -272,10 +273,10 @@ export class LlmSpansApi {
 
   private toMessage(msg: ChatMessage): Message | Message[] {
     if (msg.role === "assistant") {
-      return { content: msg.content, role: "assistant" };
+      return { content: messageTextWithPlaceholders(msg), role: "assistant" };
     }
     if (msg.role === "user") {
-      return { content: msg.content, role: "user" };
+      return { content: messageTextWithPlaceholders(msg), role: "user" };
     }
     if (msg.role === "system") {
       return { content: msg.content, role: "system" };
@@ -289,7 +290,7 @@ export class LlmSpansApi {
       });
     }
     if (msg.role === "tool") {
-      return { content: msg.content, role: "tool" };
+      return { content: messageTextWithPlaceholders(msg), role: "tool" };
     }
     if (msg.role === "reasoning") {
       return { content: msg.content ?? "", role: "reasoning" };

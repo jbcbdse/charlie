@@ -360,4 +360,55 @@ describe("OpenAiResponsesExecutor", () => {
       }),
     );
   });
+
+  it("maps image attachments on input and folds image_generation_call results", async () => {
+    const create = jest.fn().mockResolvedValue(
+      completedStream({
+        output: [
+          {
+            type: "image_generation_call",
+            result: "AAAA",
+          },
+        ],
+      }),
+    );
+    const executor = new OpenAiResponsesExecutor({
+      modelId: "gpt-5.4",
+      openAiClient: { responses: { create } } as unknown as OpenAI,
+    });
+    const result = await executor.execute({
+      context: context(),
+      messages: [
+        {
+          role: "user",
+          content: "draw",
+          attachments: [{ mimeType: "image/png", data: "BBBB" }],
+        },
+      ],
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: [
+          {
+            role: "user",
+            content: [
+              { type: "input_text", text: "draw" },
+              {
+                type: "input_image",
+                image_url: "data:image/png;base64,BBBB",
+                detail: "auto",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.responseMessages).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        attachments: [{ mimeType: "image/png", data: "AAAA" }],
+      },
+    ]);
+  });
 });

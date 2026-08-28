@@ -1,6 +1,23 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { z } from "zod";
-import { ChatAgentContext } from "./types";
+import { Attachment, ChatAgentContext } from "./types";
+
+export type ToolResult =
+  | string
+  | { content: string; attachments?: Attachment[] };
+
+export function normalizeToolResult(result: ToolResult): {
+  content: string;
+  attachments?: Attachment[];
+} {
+  if (typeof result === "string") {
+    return { content: result };
+  }
+  if (result.attachments?.length) {
+    return { content: result.content, attachments: result.attachments };
+  }
+  return { content: result.content };
+}
 
 /**
  * All tools must confirm to this interface
@@ -17,7 +34,7 @@ export interface ITool {
    * if false, the tool response will be sent back to the LLM
    */
   returnDirect?: boolean;
-  handle(params: any, context: ChatAgentContext): Promise<string>;
+  handle(params: any, context: ChatAgentContext): Promise<ToolResult>;
 }
 /**
  * User-defined tools can extend this class to automatically validate with a zod schema
@@ -33,7 +50,10 @@ export abstract class BaseTool implements ITool {
   /**
    * This method should be called by the executor and performs validation
    */
-  public async handle(params: any, context: ChatAgentContext): Promise<string> {
+  public async handle(
+    params: any,
+    context: ChatAgentContext,
+  ): Promise<ToolResult> {
     params = await this.schema.parseAsync(params).catch((err) => {
       throw new Error(
         `Invalid parameters for tool ${this.name}: ${err.message}`,
@@ -44,5 +64,5 @@ export abstract class BaseTool implements ITool {
   public abstract handler(
     params: z.infer<typeof this.schema>,
     context: ChatAgentContext,
-  ): string | Promise<string>;
+  ): ToolResult | Promise<ToolResult>;
 }

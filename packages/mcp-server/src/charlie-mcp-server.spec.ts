@@ -7,6 +7,7 @@ import { CharlieMcpServer } from "./charlie-mcp-server";
 import {
   EchoTool,
   FailingTool,
+  ImageTool,
   ProgressTool,
   WhoAmITool,
 } from "./test-fixtures/echo-tool";
@@ -59,6 +60,26 @@ describe("CharlieMcpServer", () => {
       });
       expect(result.isError).toBeFalsy();
       expect(result.content).toEqual([{ type: "text", text: "echo: hi" }]);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("returns image attachments as MCP image content", async () => {
+    const client = await connectWith(
+      new CharlieMcpServer({
+        tools: [new ImageTool()],
+        name: "charlie-mcp-server-test",
+        version: "0.0.0",
+      }),
+    );
+    try {
+      const result = await client.callTool({ name: "image", arguments: {} });
+      expect(result.isError).toBeFalsy();
+      expect(result.content).toEqual([
+        { type: "text", text: "here" },
+        { type: "image", mimeType: "image/png", data: "AAAA" },
+      ]);
     } finally {
       await client.close();
     }

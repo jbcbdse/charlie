@@ -12,6 +12,10 @@ import {
   EventName,
   EventSubscriber,
   eventProducer as defaultEventProducer,
+  attachmentBase64,
+  attachmentPlaceholder,
+  isImageMimeType,
+  normalizeToolResult,
   type ChatAgentContext,
   type EventProducer,
   type EventTypeMap,
@@ -166,8 +170,27 @@ export class CharlieMcpServer {
         ? undefined
         : this.forwardToolProgress(context, extra, progressToken);
     try {
-      const text = await tool.handle(params.arguments ?? {}, context);
-      return { content: [{ type: "text", text }] };
+      const result = await tool.handle(params.arguments ?? {}, context);
+      const { content, attachments } = normalizeToolResult(result);
+      const blocks: CallToolResult["content"] = [];
+      if (content) {
+        blocks.push({ type: "text", text: content });
+      }
+      for (const attachment of attachments ?? []) {
+        if (isImageMimeType(attachment.mimeType)) {
+          blocks.push({
+            type: "image",
+            mimeType: attachment.mimeType,
+            data: attachmentBase64(attachment),
+          });
+        } else {
+          blocks.push({
+            type: "text",
+            text: attachmentPlaceholder(attachment),
+          });
+        }
+      }
+      return { content: blocks.length ? blocks : [{ type: "text", text: "" }] };
     } catch (error) {
       return {
         content: [

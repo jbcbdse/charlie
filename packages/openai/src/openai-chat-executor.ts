@@ -11,6 +11,7 @@ import {
   CharlieStreamPart,
   ToolChoice,
 } from "@jbcbdse/charlie-core";
+import { toOpenAiContent, parseDataUrl } from "./content-parts";
 
 export interface OpenAiChatExecutorOptions {
   modelProvider?: string;
@@ -81,7 +82,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
       ...request,
       stream: true,
       stream_options: { include_usage: true },
-    });
+    } as OpenAI.Chat.ChatCompletionCreateParamsStreaming);
     let lastChunk: unknown;
     const result = await new CharlieStreamConsumer(context, this).consume(
       this.toCharlieStream(stream, (part) => {
@@ -114,7 +115,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
         };
         choices?: {
           delta?: {
-            content?: string | null;
+            content?: string | unknown[] | null;
             reasoning_content?: string | null;
             reasoning?: string | null;
             tool_calls?: {
@@ -137,8 +138,29 @@ export class OpenAiChatExecutor implements ChatExecutor {
       }
       const delta = part.choices?.[0]?.delta;
       if (!delta) continue;
-      if (delta.content) {
+      if (typeof delta.content === "string" && delta.content) {
         yield { type: "text", text: delta.content };
+      }
+      if (Array.isArray(delta.content)) {
+        for (const contentPart of delta.content as {
+          type?: string;
+          text?: string;
+          image_url?: { url?: string };
+        }[]) {
+          if (contentPart.type === "text" && contentPart.text) {
+            yield { type: "text", text: contentPart.text };
+          }
+          if (contentPart.type === "image_url" && contentPart.image_url?.url) {
+            const parsed = parseDataUrl(contentPart.image_url.url);
+            if (parsed) {
+              yield {
+                type: "attachment",
+                mimeType: parsed.mimeType,
+                data: parsed.data,
+              };
+            }
+          }
+        }
       }
       const thinking = delta.reasoning_content || delta.reasoning;
       if (thinking) {
@@ -179,7 +201,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
         if (msg.role === "user") {
           return {
             role: "user",
-            content: msg.content,
+            content: toOpenAiContent(msg.content, msg.attachments),
             name: msg.name,
           };
         }
@@ -207,14 +229,14 @@ export class OpenAiChatExecutor implements ChatExecutor {
         if (msg.role === "assistant") {
           return {
             role: "assistant",
-            content: msg.content,
+            content: toOpenAiContent(msg.content, msg.attachments),
             name: msg.name,
           };
         }
         if (msg.role === "tool") {
           return {
             role: "tool",
-            content: msg.content,
+            content: toOpenAiContent(msg.content, msg.attachments),
             tool_call_id: msg.toolCallId,
           };
         }
