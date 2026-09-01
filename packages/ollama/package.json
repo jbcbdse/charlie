@@ -1,6 +1,6 @@
 {
   "name": "@jbcbdse/charlie-ollama",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "",
   "repository": {
     "type": "git",
@@ -25,6 +25,6 @@
   "author": "Jonathan Barnett",
   "license": "MIT",
   "dependencies": {
-    "@jbcbdse/charlie-openai": "^0.5.0"
+    "@jbcbdse/charlie-openai": "^1.0.0"
   }
 }

@@ -17,7 +17,7 @@ import type {
 } from "./types";
 
 export class McpSession {
-  private static readonly clientInfo = { name: "charlie", version: "0.5.0" };
+  private static readonly clientInfo = { name: "charlie", version: "1.0.0" };
 
   private constructor(
     public readonly name: string,

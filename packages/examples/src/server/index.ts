@@ -230,7 +230,7 @@ async function start() {
   const mcpHandler = new CharlieMcpHttpHandler({
     tools: localTools,
     name: "charlie-examples",
-    version: "0.5.0",
+    version: "1.0.0",
   });
   app.all("/mcp", (req, res) => mcpHandler.handle(req, res));
   const shutdown = async () => {
