@@ -200,11 +200,11 @@ export type ChatRun = Promise<ChatAgentGetResponseOutput> & {
   on<T extends EventName>(
     eventName: T,
     listener: (event: EventTypeMap[T], eventName: T) => void,
-  ): void;
+  ): ChatRun;
   off<T extends EventName>(
     eventName: T,
     listener: (event: EventTypeMap[T], eventName: T) => void,
-  ): void;
+  ): ChatRun;
   [Symbol.asyncIterator](): AsyncIterableIterator<EventChatStreamChunk>;
 };
 export interface ChatAgent {

@@ -48,8 +48,11 @@ export class ChatRunGenerator {
     return this.run;
   }
 
-  private on<T extends EventName>(eventName: T, listener: Listener<T>): void {
-    if (this.settled) return;
+  private on<T extends EventName>(
+    eventName: T,
+    listener: Listener<T>,
+  ): ChatRun {
+    if (this.settled) return this.run;
     const wrapped: Listener<T> = (event, name) => {
       if (event.context.runId !== this.runId) return;
       try {
@@ -72,15 +75,20 @@ export class ChatRunGenerator {
       wrapped as Listener<EventName>,
     );
     this.subscriber.on(eventName, wrapped);
+    return this.run;
   }
 
-  private off<T extends EventName>(eventName: T, listener: Listener<T>): void {
+  private off<T extends EventName>(
+    eventName: T,
+    listener: Listener<T>,
+  ): ChatRun {
     const byListener = this.wrappers.get(eventName);
     const wrapped = byListener?.get(listener as Listener<EventName>);
     if (wrapped) {
       this.subscriber.off(eventName, wrapped);
       byListener?.delete(listener as Listener<EventName>);
     }
+    return this.run;
   }
 
   private offAll(): void {

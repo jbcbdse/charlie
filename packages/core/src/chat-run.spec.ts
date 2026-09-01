@@ -49,6 +49,45 @@ describe("ChatRunGenerator", () => {
     });
   });
 
+  it("returns the run from .on so listeners can chain into await", async () => {
+    const producer = new EventProducer();
+    const heard: string[] = [];
+    const result = await new ChatRunGenerator(producer, "run", async () => {
+      emitText(producer, "run", "hi");
+      return emptyResult;
+    })
+      .create()
+      .on(EventName.ChatStreamChunk, ({ chunk }) => {
+        if (chunk.type === "text") heard.push(chunk.text);
+      })
+      .on(EventName.ChatStreamChunk, ({ chunk }) => {
+        if (chunk.type === "text") heard.push(`${chunk.text}!`);
+      });
+    expect(result).toEqual(emptyResult);
+    expect(heard).toEqual(["hi", "hi!"]);
+  });
+
+  it("returns the run from .off so it can chain", async () => {
+    const producer = new EventProducer();
+    const heard: string[] = [];
+    const listener = ({
+      chunk,
+    }: {
+      chunk: { type: string; text?: string };
+    }): void => {
+      if (chunk.type === "text" && chunk.text) heard.push(chunk.text);
+    };
+    const result = await new ChatRunGenerator(producer, "run", async () => {
+      emitText(producer, "run", "hi");
+      return emptyResult;
+    })
+      .create()
+      .on(EventName.ChatStreamChunk, listener)
+      .off(EventName.ChatStreamChunk, listener);
+    expect(result).toEqual(emptyResult);
+    expect(heard).toEqual([]);
+  });
+
   it("scopes .on listeners to the runId", async () => {
     const producer = new EventProducer();
     const heardA: string[] = [];

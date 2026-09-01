@@ -1,82 +1,84 @@
 # Charlie
 
-Charlie is a TypeScript framework for executing different AI models with a unified interface.
+Charlie is a thin, stateless TypeScript layer for calling chat LLMs through one interface. You own message history. Charlie owns one round-trip: call the model, run tools in a loop, stream tokens, return the new messages.
 
-Charlie is the handler of many agents.
+The extension point is `ChatExecutor` (one per provider). `AiChatAgent` is provider-agnostic. Swap the executor to swap models without rewriting tools, history, or observability.
+
+A working REPL, HTTP server, and live e2e suite live in the `examples` package.
 
 ## Installation
 
-Configure your .npmrc to install these packages from github:
+Configure `.npmrc` to install from GitHub Packages:
 
 ```
 @jbcbdse:registry=https://npm.pkg.github.com
 ```
 
-Install core:
-
 ```
 npm install @jbcbdse/charlie-core
+npm install @jbcbdse/charlie-openai          # GPT, OpenAI Responses, Grok
+npm install @jbcbdse/charlie-bedrock         # Bedrock Converse
+npm install @jbcbdse/charlie-bedrock-mantle  # Mantle Completions, Responses, Messages
+npm install @jbcbdse/charlie-google          # Gemini
+npm install @jbcbdse/charlie-ollama          # OpenAI-compatible Ollama
+npm install @jbcbdse/charlie-mcp             # call MCP servers as ITool[]
+npm install @jbcbdse/charlie-mcp-server      # expose ITool[] as an MCP server
+npm install @jbcbdse/charlie-datadog         # LLM Observability spans
 ```
 
-Install vendor-specific packages:
+## Quick start
 
+```ts
+import { AiChatAgent, EventName } from "@jbcbdse/charlie-core";
+import { OpenAiChatExecutor } from "@jbcbdse/charlie-openai";
+
+const agent = new AiChatAgent({
+  chatExecutor: new OpenAiChatExecutor({
+    modelId: "gpt-4o",
+    apiKey: process.env.OPENAI_API_KEY!,
+  }),
+  systemPromptTemplate: "You are a helpful assistant. User: {{user}}",
+});
+
+const { responseMessages, usage } = await agent
+  .getResponse({
+    messages: [{ role: "user", content: "Hello" }],
+    tools: [new CountLettersTool()],
+    meta: { user: { preferred_name: "Jon" } },
+  })
+  .on(EventName.ChatStreamChunk, ({ chunk }) => {
+    if (chunk.type === "text") process.stdout.write(chunk.text);
+  });
+// persist [...history, ...responseMessages] yourself for the next turn
 ```
-# for openai (gpt)
-npm install @jbcbdse/charlie-openai
-# for bedrock
-npm install @jbcbdse/charlie-bedrock
-# for bedrock mantle (OpenAI-compatible)
-npm install @jbcbdse/charlie-bedrock-mantle
-# for google (gemini)
-npm install @jbcbdse/charlie-google
-# for ollama (OpenAI-compatible)
-npm install @jbcbdse/charlie-ollama
+
+`getResponse` is not `async`. It returns a **`ChatRun`**: a thenable with `.on` / `.off` and an async iterator. `.on` and `.off` return the same run, so you can chain listeners and `await` in one expression. `await` still waits for the whole turn, including tool loops. Attach listeners synchronously — the loop starts on `queueMicrotask`.
+
+```ts
+for await (const { chunk } of run) {
+  if (chunk.type === "text") process.stdout.write(chunk.text);
+}
 ```
 
-## Features
+## Chat
 
-The best way to see the implementation is to look at the `examples` package, which has a terminal REPL for chat.
+`AiChatAgent` takes the full `messages` array, calls the executor, runs any tool calls, and repeats until the model stops calling tools (or a `returnDirect` tool fires). It does not keep history between turns.
 
-Charlie's mission (if you choose to accept it) is to be a simpler, flexible utility to interact with chat LLMs. Charlie also comes with executors for text embeddings, with more use cases to be added in the future.
+`ChatMessage` is a common shape across providers: `system`, `user`, `assistant`, `tool_call`, `tool`, and `reasoning`. Bedrock Converse only has user/assistant on the wire; OpenAI has more roles. Charlie maps both ways so the same history works with every executor.
 
-### Chat Agent
+System prompts are templates with `{{key}}` placeholders. `meta` passed to `getResponse` is serialized (YAML by default, via `TemplateSerializer`) and substituted in. That is how user context, available agent names, and similar values reach the prompt without hardcoding.
 
-Charlie provides a `ChatAgent` interface, and implementations for Bedrock Converse and OpenAI. The key implementation is the `AiChatAgent` class.
+You can stitch agents together: pipe one agent's output into another for summarization or guardrails, or have a tool call a second agent.
 
-The **Agent**'s job is to receive a single request, call the appropriate **tools**, and provide a single response. It invokes the AI model through a `ChatExecutor` implementation. The request contains an array of `ChatMessage` objects, a **prompt template**, an array of `BaseTool` objects representing the tools the agent can execute, and a `ChatAgentContext` object that is visible to the Agent, the Executor, all Tools, and can fill in blanks in the System Prompt via the Template.
+## Streaming
 
-The Agent is stateless and only persists contextual data for a single interaction. It is up to you to provide **memory** by storing and providing the array of `ChatMessage` objects. While an Agent may seem complex, invoking the agent is a fairly lightweight function call. You can create more complex workflows by stitching agent calls together. You might pipe the output from one Agent to another Agent for post-processing, summarization, or to apply guardrails. You might have a Tool that calls a second Agent to help provide an answer to the first Agent.
+Executors always use the provider stream API and map vendor parts into `CharlieStreamPart`: `text`, `thinking`, `tool_call`, `attachment`, `reasoning`, `usage`, `error`. Core emits `chat:stream:chunk` and folds parts into `responseMessages`.
 
-The `AiChatAgent` class is likely the only `ChatAgent` class you need, and you can tailor it for various LLMs:
+Thinking tokens are stream-only; they are never concatenated into `MessageAssistant.content`. Yield `reasoning` when the provider needs a round-trip (OpenAI Responses encrypted reasoning, Anthropic thinking signatures). Completions-style `reasoning_content` stays `thinking`.
 
-- You must provide `ChatExecutor` to call your preferred model.
-- Tume your system prompt template to provide appropriate base instructions for the given model.
-- Inject a different `TemplateSerializer` to change our blanks are filled in the system prompt. By default, YAML is used, but other models may work better with different formats for provided context parameters.
-- Inject one or more pre- and post-tool-call transformers to tweak the output from the LLM before or after tools are executed.
+## Tools
 
-### Chat Executors
-
-You must provide a `ChatExecutor` to the `AiChatAgent`. Two executors are provided by this package (so far): `BedrockChatExecutor` and `OpenAiChatExecutor`.
-
-Tool calling in Bedrock's Converse API is only supported by certain models, other models are supported through the `BedrockChatExecutor`. It provides a default `toolPromptGenerator` that inserts detailed instructions in the system prompt telling the AI how to call tools. It also provides a default `toolCallParser` to parse out tool calls from "assistant" messages and treat them as if they came natively from the Converse API.
-
-The `ChatExecutor` interface is simple. You can write your own `ChatExecutor` for providers not implemented here and use it with the `AiChatAgent`. This is the major benefit to this library: you can easily swap agents in your application to use different AI models.
-
-### ChatMessage interface
-
-The `ChatMessage` interfaces provide a common data structure meeting the features of _most_ chat APIs. For example, Bedrock Converse only supports "user" and "assistant" messages while OpenAI supports "user", "assistant", "tool", and "tool_call" as different message types. By providing a common interface, your same chat history can be sent to any `ChatExecutor` and work with any supported LLM.
-
-### events
-
-The `events`, `EventName`, and `EventTypeMap` exports allow you to subscribe to events with strong types. Use this to better observe Charlie's behavior.
-
-`ChatExecutor` implementations, including any you provide, should implement a couple key events that provide insight into raw LLM calls.
-
-**This is the best way to implement logging**: subscribe to all events by looping over the `EventName` enum and log the events as you see fit.
-
-### Tools
-
-Tools are asynchronous functions that take a structured input and return a string telling the API how to respond.
+Extend `BaseTool` with a Zod schema and a `handler`. The handler may return a string or `{ content, attachments }`. It receives `ChatAgentContext`, including the `meta` you passed to `getResponse`.
 
 ```ts
 import { z } from "zod";
@@ -87,12 +89,8 @@ export class CountLettersTool extends BaseTool {
   public description =
     "Count the number of times a letter appears in a word or phrase.";
   public schema = z.object({
-    word: z
-      .string()
-      .describe("The word or phrase whose letters you want to count."),
-    letter: z
-      .string()
-      .describe("The letter you want to count in the word or phrase."),
+    word: z.string().describe("The word or phrase whose letters you want to count."),
+    letter: z.string().describe("The letter you want to count in the word or phrase."),
   });
   public handler({ word, letter }: z.infer<typeof this.schema>): string {
     const count = word.toLowerCase().split(letter.toLowerCase()).length - 1;
@@ -101,17 +99,19 @@ export class CountLettersTool extends BaseTool {
 }
 ```
 
-This example tool takes arguemnts for "word" and "letter" and returns an instruction for the AI to give an answer to the user. This simple function is not async, but it could be. The tool will also receive a "context" argument that will contain any arbitrary information you provide to the agent, such as the user information.
+Set `returnDirect = true` to stop the loop and return the tool result without re-entering the LLM — useful for side effects such as account deletion. Attachments on a `returnDirect` result are copied onto the synthetic assistant message.
 
-## Embeddings
+**Tool choice.** Pass `mustCallTool` and/or `requiredToolName` on `getResponse` (copied onto mutable `context`). `mustCallTool` forces at least one tool call. `requiredToolName` forces that one named tool and wins over `mustCallTool`. Force applies to the next executor call, then clears, so the loop can answer after tools run. Re-set it from `preRun` / `postToolCall` / a tool handler to force again. Do not put `required` on `ITool`. Bedrock `toolsSupported: false` cannot force a call (the inline prompt path has no API `toolChoice`).
 
-The `TextEmbeddingGenerator` interface is simple to implement. There are 3 implementations provided here so far. The `OpenAiTextEmbeddingGenerator` uses OpenAI. `TitanTextEmbeddingGenerator` and `CohereTextEmbeddingGenerator` are provided here for Bedrock.
-
-Generated embeddings are specific to the model, and the generator should always return the `modelId` as part of its response. But having a common, simple interface might allow you to swap in different embedding generators into your application and A/B test different models in your own vector store.
+Some Bedrock models have no native Converse tool calling. Set `toolsSupported: false` on `BedrockChatExecutor` and add `InlineToolCallParser` to `preToolCallTransformers`. The parser reads JSON tool calls out of plain text and converts them to `MessageToolCall`.
 
 ## Attachments
 
-User, assistant, and tool messages may include `attachments?: Attachment[]`. Each attachment has a `mimeType` and `data` (base64 string or `Uint8Array`). Executors map attachments to the vendor media block when that API supports the MIME type; otherwise they append `[attachment image/png]` (or similar) to the text. Streamed media arrives as `chat:stream:chunk` parts with `type: "attachment"` and is folded onto the assistant message.
+User, assistant, and tool messages may include `attachments?: Attachment[]`. Each attachment has a `mimeType` and `data` (base64 string or `Uint8Array`; Node `Buffer` is a `Uint8Array`). There is no `url` field.
+
+Executors send native media when the MIME type is supported (OpenAI `image_url` / `input_image`, Bedrock `image`/`document`, Anthropic image source, Gemini `inlineData`). Otherwise they append a text placeholder such as `[attachment image/png]`. Streamed media arrives as `type: "attachment"` chunks and folds onto the assistant message.
+
+OpenAI Chat and Responses only accept media on user turns, so assistant/tool attachments go out as placeholders and tool images are re-sent as a follow-up user message. Anthropic tool results can still carry image/document blocks.
 
 ```ts
 await agent.getResponse({
@@ -125,36 +125,189 @@ await agent.getResponse({
 });
 ```
 
-Tools may return `{ content, attachments }` so images from tools (including MCP) round-trip into history. Charlie does not enable provider image-generation tools or response modalities on its own; if a model already returns media in the chat stream, it is stored as attachments.
+Encoding and placeholders live on an injectable `AttachmentFormatter` (same pattern as `TemplateSerializer`). Pass `attachmentFormatter` on executor/converter options if you want to swap it.
 
-## Other model types
+Charlie does not auto-enable provider image-generation tools or response modalities. If a model already returns media in the chat stream, it is stored as attachments.
 
-TBD
+## Transformers
 
-## Out of scope
+Pass `ChatMessageTransformer`s on the agent. Each receives messages and `context` and returns messages (sync or async). `context` is shared for the rest of the run.
 
-A key goal is for Charlie to be simple and leave you in control. Some common features are out of scope
+- **preRunTransformers** — once before the first executor call. Return the messages to send. Replace `context.tools` (a copy of the `getResponse` tools) to filter the list.
+- **preToolCallTransformers** — each LLM response, before tools run.
+- **postToolCallTransformers** — after tools run, before the next executor call.
+- **postRunTransformers** — once after the turn, reshape `responseMessages`.
 
-### Memory
+```ts
+import { AiChatAgent, ToolAssistantFilter } from "@jbcbdse/charlie-core";
+import { InlineToolCallParser } from "@jbcbdse/charlie-bedrock";
 
-"Memory" is generally out of scope. Providing memory to a chat prompt is generally as simple as providing an array of message objects. How those message objects are stored and then later loaded is an exercise for the consumer.
+const agent = new AiChatAgent({
+  chatExecutor,
+  preRunTransformers: [
+    {
+      transform(messages, context) {
+        context.tools = context.tools.filter((t) => t.name !== "DangerousTool");
+        return messages.slice(-20);
+      },
+    },
+  ],
+  preToolCallTransformers: [
+    new InlineToolCallParser(),
+    new ToolAssistantFilter(),
+  ],
+  postToolCallTransformers: [
+    {
+      transform(messages, context) {
+        context.tools = [];
+        return messages;
+      },
+    },
+  ],
+  postRunTransformers: [
+    {
+      transform(messages) {
+        return messages.filter((m) => m.role !== "reasoning");
+      },
+    },
+  ],
+});
+```
 
-### Vector search
+`ToolAssistantFilter` keeps only tool-call (and reasoning) messages when the model mixed in assistant text. `InlineToolCallParser` turns JSON embedded in plain text into `MessageToolCall` — use it when Bedrock `toolsSupported` is `false`. `postToolCall` can also set `context.requiredToolName` to force a tool on the next loop.
 
-Similarly, "vector search" on its own is out of scope. This tool may be used to generate embeddings, but the consumer is responsible for storing them. The consumer may provide a vector search _tool_ to be called, but the behavior of such a tool is an exercise for the consumer.
+## Run context
 
-### Post-processing and parsing
+Each `getResponse` call builds one `ChatAgentContext` and hands the **same object** to transformers, tools, executors, and events. Mutate it to change later loop iterations. It is discarded when the run ends; the next `getResponse` starts a new context.
 
-The output from an agent should be simple enough for you to perform any post-processing outside of the agent. It should not need to be embedded in the agent, though you can use the `Transformer`s to process LLM responses before and after tools are called, or `preRunTransformers` to filter tools and incoming messages before the first model call.
+`messages` and `tools` are **shallow copies** of the arrays you passed. Replacing `context.tools` does not change the caller's list. `meta` is the **same object** you passed — writes are visible to the caller.
 
-### Text splitting
+What you typically mutate:
 
-Generating text embeddings is in scope, but how the text is provided is not in scope for Charlie. When generating text embeddings for a large document, like a Wikipedia page, you should probably split the text into small logical chunks so that you produce multiple vectors that can surface that document in a search. Too much text will result in a vector that is too generic to provide good search results. It's not Charlie's job to split up the text for you! Have an LLM do it for you!
+- **tools** — filter or replace the list for later executor calls
+- **mustCallTool** / **requiredToolName** — force a tool on the next executor call. The agent applies this once, then clears it. Set it again from a transformer or tool handler if you need another forced call
+- **systemPromptTemplate** and **meta** — the agent re-serializes the template from `meta` on every iteration. Write `systemPromptTemplate`, not `systemPrompt`; the agent overwrites `systemPrompt` each loop
+- **messages** — `preRun` returns the array the rest of the run will send. After that the agent appends tool-loop messages itself
 
-## Notes
+`runId` and `modelId` are set by the agent. `toolName` / `toolCallId` exist only while a tool `handle()` is running.
 
-[OpenAI's API](https://platform.openai.com/docs/api-reference/chat/create) includes tools as a parameter to the REST API. The prompt is an array of chat messages. In other words, free-form prompts are not supported and the format of the tool prompt is not exposed to the consumer. The legacy "[completions](https://platform.openai.com/docs/api-reference/completions)" endpoint is flagged as legacy and the documentation encourages using the Chat API instead. In other words, rolling your own prompt synthesis to support functions and chat messages is not recommended. This tool must be compatble with this structure.
+```ts
+class AdvanceStepTool extends BaseTool {
+  public name = "AdvanceStepTool";
+  public description = "Move the run into the summarize step.";
+  public schema = z.object({});
+  public handler(
+    _params: z.infer<typeof this.schema>,
+    context: ChatAgentContext,
+  ): string {
+    context.meta.step = "summarize";
+    context.systemPromptTemplate = "Summarize for {{user}}.";
+    context.requiredToolName = "WriteSummary";
+    return "advanced";
+  }
+}
+```
 
-On the flip side, with [Bedrock and Claude](https://medium.com/@zeek.granston/function-calling-with-anthropic-claude-and-amazon-bedrock-c6eda7358b0f), the function definition and prompt is not built in. [Similar source](https://medium.com/@daniellefranca96/running-a-langchain-agent-on-bedrock-claude-using-the-model-function-calling-5f400a8f0d62), but using LangChain and python to build the prompt.
+## Events
 
-NEW: Since writing the above, AWS has released the Converse API that does support chat history and tools, similar to OpenAI.
+Executors emit `ChatExecutorStart` and `ChatExecutorEnd` (plus raw request/response, stream chunks, and tool events). You subscribe at three scopes — they are not limited to the global bus.
+
+**This run.** `ChatRun.on` filters by `context.runId` for you. Attach listeners synchronously after `getResponse` returns.
+
+```ts
+const result = await agent
+  .getResponse({ messages, tools })
+  .on(EventName.ChatStreamChunk, ({ chunk }) => {
+    if (chunk.type === "text") process.stdout.write(chunk.text);
+  })
+  .on(EventName.ToolProgress, ({ message, toolName }) => {
+    console.log(`[progress] ${toolName}: ${message}`);
+  });
+```
+
+**This agent / process.** Construct an `EventProducer`, pass it into `AiChatAgent` (and into tools via `context.eventProducer`), and subscribe with `EventSubscriber`. `@jbcbdse/charlie-datadog` listens to whichever subscriber you give it.
+
+```ts
+import { AiChatAgent, EventName, EventProducer, EventSubscriber } from "@jbcbdse/charlie-core";
+import { LlmSpansApi } from "@jbcbdse/charlie-datadog";
+
+const producer = new EventProducer();
+const bus = new EventSubscriber(producer);
+
+const agent = new AiChatAgent({
+  chatExecutor,
+  eventProducer: producer,
+});
+
+bus.on(EventName.ChatExecutorEnd, ({ usage, modelId }) => {
+  console.log(modelId, usage);
+});
+
+new LlmSpansApi({
+  apiKey: process.env.DD_API_KEY!,
+  tags: { service: "my-service", env: "dev" },
+}).listen(bus);
+```
+
+**Process-wide default.** `events` is an `EventSubscriber` on the shared `eventProducer` singleton. Executors and agents use that singleton if you do not inject your own. A global listener must filter by `requestId` / `runId` itself.
+
+```ts
+import { events, EventName } from "@jbcbdse/charlie-core";
+
+events.on(EventName.Log, ({ message, level }) => {
+  console.log(level, message);
+});
+```
+
+## Embeddings
+
+`TextEmbeddingGenerator` is a small interface: generate vectors and always return `modelId` with the result. Implementations:
+
+- `OpenAiTextEmbeddingGenerator`
+- `TitanTextEmbeddingGenerator` and `CohereTextEmbeddingGenerator` (Bedrock)
+
+Vectors are model-specific. A common interface lets you A/B generators against your own store.
+
+## MCP
+
+**Client** (`@jbcbdse/charlie-mcp`). `McpSessions.connect` talks to stdio or Streamable HTTP servers. MCP tools become `ITool[]` for `getResponse`. Resources (`listResources` / `readResource`) and prompts (`listPrompts` / `getPrompt` → `ChatMessage[]`) are caller APIs — `AiChatAgent` never sees them. MCP image blocks with bytes become Charlie attachments.
+
+```ts
+import { McpSessions } from "@jbcbdse/charlie-mcp";
+
+const mcp = await McpSessions.connect([
+  {
+    name: "everything",
+    transport: {
+      type: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-everything"],
+    },
+  },
+]);
+
+await agent.getResponse({ messages: history, tools: mcp.tools() });
+await mcp.close();
+```
+
+**Server** (`@jbcbdse/charlie-mcp-server`). The reverse: expose Charlie `ITool[]` as `tools/list` + `tools/call`. `CharlieMcpStdioServer.serve()` for stdio; `CharlieMcpHttpHandler.handle(req, res)` mounts as an Express (or Nest-on-Express) route. ToolProgress is forwarded as MCP `notifications/progress` when the client sent a `progressToken`.
+
+## Providers
+
+| Package | Executors |
+| --- | --- |
+| `@jbcbdse/charlie-openai` | `OpenAiChatExecutor`, `OpenAiResponsesExecutor`, `GrokExecutor` |
+| `@jbcbdse/charlie-bedrock` | `BedrockChatExecutor` (Converse) |
+| `@jbcbdse/charlie-bedrock-mantle` | Completions, Responses (`store: false`), Anthropic Messages |
+| `@jbcbdse/charlie-google` | `GeminiExecutor` |
+| `@jbcbdse/charlie-ollama` | `OllamaExecutor` |
+
+`ChatExecutor` is three fields: `modelProvider`, `modelId`, and `execute(input)`. Implement that plus `ChatExecutorStart` / `ChatExecutorEnd` to add a provider. Copy the pattern from `openai-chat-executor.ts`.
+
+## Footnotes
+
+Charlie stays small by leaving you in control of everything around the round-trip:
+
+- **Memory.** Pass an array of `ChatMessage` objects. How you store and reload them is yours.
+- **Vector search.** Charlie can generate embeddings. Storing them and searching is yours; a search tool is just another `ITool`.
+- **Text splitting.** Chunk documents before embedding so vectors stay specific. Charlie will not split Wikipedia for you.

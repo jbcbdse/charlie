@@ -36,24 +36,22 @@ Executors must emit two events (see below): `ChatExecutorStart` before the call 
 
 **`AiChatAgent`** is stateless. It receives `messages` (the full history), calls the executor, runs tool calls in a loop until there are no more, then returns. The caller is responsible for appending returned messages to its own history before the next turn.
 
-`getResponse` is not `async`. It returns a thenable **`ChatRun`** (`Promise` plus `.on` / `.off` and an async iterator). `await agent.getResponse(...)` still waits for the whole turn, including tool loops. Attach listeners synchronously after `getResponse` returns — the loop starts on `queueMicrotask`. `ChatRun.on` filters by `context.runId`.
+`getResponse` is not `async`. It returns a thenable **`ChatRun`** (`Promise` plus `.on` / `.off` and an async iterator). `.on` and `.off` return the same run, so listeners can chain into `await`. `await agent.getResponse(...)` still waits for the whole turn, including tool loops. Attach listeners synchronously after `getResponse` returns — the loop starts on `queueMicrotask`. `ChatRun.on` filters by `context.runId`.
 
 ```typescript
 const { responseMessages } = await agent.getResponse({ messages, tools });
 ```
 
 ```typescript
-const run = agent.getResponse({ messages, tools, meta });
-
-run.on(EventName.ChatStreamChunk, ({ chunk }) => {
-  if (chunk.type === "text") process.stdout.write(chunk.text);
-  if (chunk.type === "thinking") process.stderr.write(chunk.text);
-});
-run.on(EventName.ToolProgress, ({ message, toolName }) => {
-  console.log(`[progress] ${toolName}: ${message}`);
-});
-
-const { responseMessages } = await run;
+const { responseMessages } = await agent
+  .getResponse({ messages, tools, meta })
+  .on(EventName.ChatStreamChunk, ({ chunk }) => {
+    if (chunk.type === "text") process.stdout.write(chunk.text);
+    if (chunk.type === "thinking") process.stderr.write(chunk.text);
+  })
+  .on(EventName.ToolProgress, ({ message, toolName }) => {
+    console.log(`[progress] ${toolName}: ${message}`);
+  });
 ```
 
 ```typescript
