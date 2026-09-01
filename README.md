@@ -264,6 +264,7 @@ events.on(EventName.Log, ({ message, level }) => {
 `TextEmbeddingGenerator` is a small interface: generate vectors and always return `modelId` with the result. Implementations:
 
 - `OpenAiTextEmbeddingGenerator`
+- `OllamaTextEmbeddingGenerator`
 - `TitanTextEmbeddingGenerator` and `CohereTextEmbeddingGenerator` (Bedrock)
 
 Vectors are model-specific. A common interface lets you A/B generators against your own store.
