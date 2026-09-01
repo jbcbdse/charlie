@@ -10,6 +10,7 @@ import {
   EventToolProgress,
   ITool,
   MessageUser,
+  type Attachment,
 } from "@jbcbdse/charlie-core";
 import { randomUUID } from "node:crypto";
 import { AvailableAgent } from "./agents";
@@ -18,6 +19,7 @@ interface ChatRequest {
   message: string;
   agent?: AvailableAgent;
   messages?: ChatMessage[];
+  attachments?: Attachment[];
   user?: Record<string, string>;
   stream?: boolean;
 }
@@ -63,6 +65,7 @@ export function chatHandler(
       message,
       agent = "claude",
       messages = [],
+      attachments,
       user = {},
       stream = false,
     }: ChatRequest = req.body;
@@ -79,6 +82,9 @@ export function chatHandler(
     }
 
     const userMessage: MessageUser = { role: "user", content: message };
+    if (attachments?.length) {
+      userMessage.attachments = attachments;
+    }
     const history: ChatMessage[] = [...messages, userMessage];
     const requestId = randomUUID();
     const captured: CapturedEvent[] = [];

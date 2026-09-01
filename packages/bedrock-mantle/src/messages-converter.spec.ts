@@ -129,4 +129,66 @@ describe("MantleMessagesConverter", () => {
       },
     ]);
   });
+
+  it("maps image attachments to Anthropic image blocks", () => {
+    expect(
+      converter.toMessages([
+        {
+          role: "user",
+          content: "look",
+          attachments: [{ mimeType: "image/png", data: "AAAA" }],
+        },
+      ]),
+    ).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", text: "look" },
+          {
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: "image/png",
+              data: "AAAA",
+            },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("folds response image blocks onto assistant attachments", () => {
+    expect(
+      converter.fromResponse([
+        { type: "text", text: "see" },
+        {
+          type: "image",
+          source: { media_type: "image/png", data: "AAAA" },
+        },
+      ]),
+    ).toEqual([
+      {
+        role: "assistant",
+        content: "see",
+        attachments: [{ mimeType: "image/png", data: "AAAA" }],
+      },
+    ]);
+  });
+
+  it("sends assistant attachments as text placeholders", () => {
+    expect(
+      converter.toMessages([
+        {
+          role: "assistant",
+          content: "see",
+          attachments: [{ mimeType: "image/png", data: "AAAA" }],
+        },
+      ]),
+    ).toEqual([
+      {
+        role: "assistant",
+        content: [{ type: "text", text: "see\n[attachment image/png]" }],
+      },
+    ]);
+  });
 });

@@ -14,4 +14,8 @@ export type {
   McpPrompt,
   McpPromptArgument,
 } from "./types";
-export { flattenMcpContent, mcpPromptToChatMessages } from "./mcp-content";
+export {
+  flattenMcpContent,
+  mcpContentToCharlie,
+  mcpPromptToChatMessages,
+} from "./mcp-content";

@@ -1,4 +1,9 @@
-import { ChatMessage, MessageToolCall } from "@jbcbdse/charlie-core";
+import {
+  Attachment,
+  AttachmentFormatter,
+  ChatMessage,
+  MessageToolCall,
+} from "@jbcbdse/charlie-core";
 
 interface ThinkingBlock {
   type: "thinking";
@@ -9,6 +14,22 @@ interface TextBlock {
   type: "text";
   text: string;
 }
+interface ImageBlock {
+  type: "image";
+  source: {
+    type: "base64";
+    media_type: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+    data: string;
+  };
+}
+interface DocumentBlock {
+  type: "document";
+  source: {
+    type: "base64";
+    media_type: "application/pdf";
+    data: string;
+  };
+}
 interface ToolUseBlock {
   type: "tool_use";
   id: string;
@@ -18,7 +39,7 @@ interface ToolUseBlock {
 interface ToolResultBlock {
   type: "tool_result";
   tool_use_id: string;
-  content: string;
+  content: string | (TextBlock | ImageBlock | DocumentBlock)[];
   is_error?: boolean;
 }
 interface RedactedThinkingBlock {
@@ -29,6 +50,8 @@ type ContentBlockParam =
   | ThinkingBlock
   | RedactedThinkingBlock
   | TextBlock
+  | ImageBlock
+  | DocumentBlock
   | ToolUseBlock
   | ToolResultBlock;
 export interface MantleMessageParam {
@@ -44,9 +67,13 @@ interface ResponseBlock {
   name?: string;
   input?: unknown;
   data?: string;
+  source?: { media_type?: string; data?: string };
 }
 
 export class MantleMessagesConverter {
+  constructor(
+    private readonly attachmentFormatter: AttachmentFormatter = new AttachmentFormatter(),
+  ) {}
   public toMessages(messages: ChatMessage[]): MantleMessageParam[] {
     const result: MantleMessageParam[] = [];
     let assistantBlocks: ContentBlockParam[] = [];
@@ -72,7 +99,10 @@ export class MantleMessagesConverter {
       if (msg.role === "user") {
         flushAssistant();
         flushToolResults();
-        result.push({ role: "user", content: msg.content });
+        result.push({
+          role: "user",
+          content: this.toUserContent(msg.content, msg.attachments),
+        });
         continue;
       }
       if (msg.role === "reasoning") {
@@ -93,8 +123,10 @@ export class MantleMessagesConverter {
       }
       if (msg.role === "assistant") {
         flushToolResults();
-        if (msg.content) {
-          assistantBlocks.push({ type: "text", text: msg.content });
+        const text =
+          this.attachmentFormatter.messageTextWithPlaceholders(msg);
+        if (text) {
+          assistantBlocks.push({ type: "text", text });
         }
         continue;
       }
@@ -115,7 +147,7 @@ export class MantleMessagesConverter {
         toolResults.push({
           type: "tool_result",
           tool_use_id: msg.toolCallId,
-          content: msg.content,
+          content: this.toUserContent(msg.content, msg.attachments),
           is_error: msg.status === "error",
         });
         continue;
@@ -164,6 +196,30 @@ export class MantleMessagesConverter {
         messages.push({ role: "assistant", content: block.text });
         continue;
       }
+      if (block.type === "image" && block.source) {
+        flushToolCalls();
+        const source = block.source as {
+          media_type?: string;
+          data?: string;
+        };
+        if (source.data) {
+          const last = messages[messages.length - 1];
+          const attachment: Attachment = {
+            mimeType: source.media_type ?? "image/png",
+            data: source.data,
+          };
+          if (last?.role === "assistant") {
+            last.attachments = [...(last.attachments ?? []), attachment];
+          } else {
+            messages.push({
+              role: "assistant",
+              content: "",
+              attachments: [attachment],
+            });
+          }
+        }
+        continue;
+      }
       if (block.type === "tool_use" && block.id && block.name) {
         toolCalls.push({
           id: block.id,
@@ -196,6 +252,72 @@ export class MantleMessagesConverter {
       }
     }
     return merged;
+  }
+
+  private toUserContent(
+    text: string,
+    attachments?: Attachment[],
+  ): string | (TextBlock | ImageBlock | DocumentBlock)[] {
+    if (!attachments?.length) {
+      return text;
+    }
+    return this.toMediaBlocks(text, attachments);
+  }
+
+  private toMediaBlocks(
+    text: string,
+    attachments?: Attachment[],
+  ): (TextBlock | ImageBlock | DocumentBlock)[] {
+    const blocks: (TextBlock | ImageBlock | DocumentBlock)[] = [];
+    const unsupported: Attachment[] = [];
+    for (const attachment of attachments ?? []) {
+      const mime = attachment.mimeType.toLowerCase();
+      const imageMedia = this.anthropicImageMedia(mime);
+      if (imageMedia) {
+        blocks.push({
+          type: "image",
+          source: {
+            type: "base64",
+            media_type: imageMedia,
+            data: this.attachmentFormatter.base64(attachment),
+          },
+        });
+      } else if (mime === "application/pdf") {
+        blocks.push({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: this.attachmentFormatter.base64(attachment),
+          },
+        });
+      } else {
+        unsupported.push(attachment);
+      }
+    }
+    const withPlaceholders = this.attachmentFormatter.textWithUnsupported(
+      text,
+      unsupported,
+    );
+    if (withPlaceholders) {
+      blocks.unshift({ type: "text", text: withPlaceholders });
+    }
+    return blocks;
+  }
+
+  private anthropicImageMedia(
+    mimeType: string,
+  ): "image/jpeg" | "image/png" | "image/gif" | "image/webp" | undefined {
+    const mime = mimeType === "image/jpg" ? "image/jpeg" : mimeType;
+    if (
+      mime === "image/jpeg" ||
+      mime === "image/png" ||
+      mime === "image/gif" ||
+      mime === "image/webp"
+    ) {
+      return mime;
+    }
+    return undefined;
   }
 
   private asBlocks(content: string | ContentBlockParam[]): ContentBlockParam[] {

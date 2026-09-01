@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import { OpenAiChatMessage, OpenAiCompletionsRequest } from "./types";
 import {
+  Attachment,
+  AttachmentFormatter,
   ChatExecutor,
   ChatAgentGetResponseOutput,
   ChatMessage,
@@ -11,11 +13,17 @@ import {
   CharlieStreamPart,
   ToolChoice,
 } from "@jbcbdse/charlie-core";
+import {
+  isOpenAiNativeMime,
+  parseDataUrl,
+  toOpenAiContent,
+} from "./content-parts";
 
 export interface OpenAiChatExecutorOptions {
   modelProvider?: string;
   modelId: string;
   promptSerializer?: TemplateSerializer;
+  attachmentFormatter?: AttachmentFormatter;
   openAiClient?: OpenAI;
   apiKey?: string | (() => Promise<string>);
   baseURL?: string;
@@ -25,12 +33,15 @@ export interface OpenAiChatExecutorOptions {
 }
 export class OpenAiChatExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
+  private attachmentFormatter: AttachmentFormatter;
   public modelProvider: string;
   public modelId: string;
   constructor(private options: OpenAiChatExecutorOptions) {
     this.options.modelId ??= "o4-mini";
     this.modelProvider = options.modelProvider ?? "openai";
     this.modelId = this.options.modelId;
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
     this.openAiClient =
       options.openAiClient ??
       new OpenAI({
@@ -81,7 +92,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
       ...request,
       stream: true,
       stream_options: { include_usage: true },
-    });
+    } as OpenAI.Chat.ChatCompletionCreateParamsStreaming);
     let lastChunk: unknown;
     const result = await new CharlieStreamConsumer(context, this).consume(
       this.toCharlieStream(stream, (part) => {
@@ -114,7 +125,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
         };
         choices?: {
           delta?: {
-            content?: string | null;
+            content?: string | unknown[] | null;
             reasoning_content?: string | null;
             reasoning?: string | null;
             tool_calls?: {
@@ -137,8 +148,29 @@ export class OpenAiChatExecutor implements ChatExecutor {
       }
       const delta = part.choices?.[0]?.delta;
       if (!delta) continue;
-      if (delta.content) {
+      if (typeof delta.content === "string" && delta.content) {
         yield { type: "text", text: delta.content };
+      }
+      if (Array.isArray(delta.content)) {
+        for (const contentPart of delta.content as {
+          type?: string;
+          text?: string;
+          image_url?: { url?: string };
+        }[]) {
+          if (contentPart.type === "text" && contentPart.text) {
+            yield { type: "text", text: contentPart.text };
+          }
+          if (contentPart.type === "image_url" && contentPart.image_url?.url) {
+            const parsed = parseDataUrl(contentPart.image_url.url);
+            if (parsed) {
+              yield {
+                type: "attachment",
+                mimeType: parsed.mimeType,
+                data: parsed.data,
+              };
+            }
+          }
+        }
       }
       const thinking = delta.reasoning_content || delta.reasoning;
       if (thinking) {
@@ -173,53 +205,75 @@ export class OpenAiChatExecutor implements ChatExecutor {
   }
 
   private toOpenAiMessages(messages: ChatMessage[]): OpenAiChatMessage[] {
-    return messages
-      .filter((msg) => msg.role !== "reasoning")
-      .map((msg) => {
-        if (msg.role === "user") {
-          return {
-            role: "user",
-            content: msg.content,
-            name: msg.name,
-          };
-        }
-        if (msg.role === "system") {
-          return {
-            role: "system",
-            content: msg.content,
-            name: msg.name,
-          };
-        }
-        if (msg.role === "tool_call") {
-          return {
-            role: "assistant",
-            content: "",
-            tool_calls: msg.toolCalls.map((toolCall) => ({
-              id: toolCall.id,
-              type: "function",
-              function: {
-                name: toolCall.function.name,
-                arguments: JSON.stringify(toolCall.function.arguments),
-              },
-            })),
-          };
-        }
-        if (msg.role === "assistant") {
-          return {
-            role: "assistant",
-            content: msg.content,
-            name: msg.name,
-          };
-        }
-        if (msg.role === "tool") {
-          return {
-            role: "tool",
-            content: msg.content,
-            tool_call_id: msg.toolCallId,
-          };
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        throw new Error(`Unknown message role: ${(msg as any)?.role}`);
+    const out: OpenAiChatMessage[] = [];
+    const deferred: Attachment[] = [];
+    for (const msg of messages) {
+      if (msg.role === "reasoning") continue;
+      if (msg.role === "user") {
+        out.push({
+          role: "user",
+          content: toOpenAiContent(
+            msg.content,
+            msg.attachments,
+            this.attachmentFormatter,
+          ),
+          name: msg.name,
+        });
+        continue;
+      }
+      if (msg.role === "system") {
+        out.push({
+          role: "system",
+          content: msg.content,
+          name: msg.name,
+        });
+        continue;
+      }
+      if (msg.role === "tool_call") {
+        out.push({
+          role: "assistant",
+          content: "",
+          tool_calls: msg.toolCalls.map((toolCall) => ({
+            id: toolCall.id,
+            type: "function",
+            function: {
+              name: toolCall.function.name,
+              arguments: JSON.stringify(toolCall.function.arguments),
+            },
+          })),
+        });
+        continue;
+      }
+      if (msg.role === "assistant") {
+        out.push({
+          role: "assistant",
+          content: this.attachmentFormatter.messageTextWithPlaceholders(msg),
+          name: msg.name,
+        });
+        continue;
+      }
+      if (msg.role === "tool") {
+        out.push({
+          role: "tool",
+          content: this.attachmentFormatter.messageTextWithPlaceholders(msg),
+          tool_call_id: msg.toolCallId,
+        });
+        deferred.push(
+          ...(msg.attachments ?? []).filter((a) =>
+            isOpenAiNativeMime(a.mimeType, this.attachmentFormatter),
+          ),
+        );
+        continue;
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      throw new Error(`Unknown message role: ${(msg as any)?.role}`);
+    }
+    if (deferred.length) {
+      out.push({
+        role: "user",
+        content: toOpenAiContent("", deferred, this.attachmentFormatter),
       });
+    }
+    return out;
   }
 }

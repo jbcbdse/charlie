@@ -339,4 +339,146 @@ describe("OpenAiChatExecutor streaming", () => {
       }),
     );
   });
+
+  it("maps user image attachments onto the request and stream image parts into history", async () => {
+    const producer = new EventProducer();
+    const create = jest.fn().mockResolvedValue(
+      asyncChunks([
+        {
+          choices: [
+            {
+              delta: {
+                content: [
+                  { type: "text", text: "ok" },
+                  {
+                    type: "image_url",
+                    image_url: { url: "data:image/png;base64,AAAA" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ]),
+    );
+    const executor = new OpenAiChatExecutor({
+      modelId: "test-model",
+      openAiClient: {
+        chat: { completions: { create } },
+      } as never,
+    });
+    const result = await executor.execute({
+      messages: [
+        {
+          role: "user",
+          content: "look",
+          attachments: [{ mimeType: "image/png", data: "AAAA" }],
+        },
+      ],
+      context: context(producer),
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "look" },
+              {
+                type: "image_url",
+                image_url: { url: "data:image/png;base64,AAAA" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.responseMessages).toEqual([
+      {
+        role: "assistant",
+        content: "ok",
+        attachments: [{ mimeType: "image/png", data: "AAAA" }],
+      },
+    ]);
+  });
+
+  it("sends assistant attachments as placeholders and tool images as a follow-up user message", async () => {
+    const producer = new EventProducer();
+    const create = jest.fn().mockResolvedValue(
+      asyncChunks([{ choices: [{ delta: { content: "ok" } }] }]),
+    );
+    const executor = new OpenAiChatExecutor({
+      modelId: "test-model",
+      openAiClient: {
+        chat: { completions: { create } },
+      } as never,
+    });
+    await executor.execute({
+      messages: [
+        { role: "user", content: "pic" },
+        {
+          role: "assistant",
+          content: "ok",
+          attachments: [{ mimeType: "image/png", data: "AAAA" }],
+        },
+        {
+          role: "tool_call",
+          toolCalls: [
+            {
+              id: "t1",
+              type: "function",
+              function: { name: "shot", arguments: {} },
+            },
+          ],
+        },
+        {
+          role: "tool",
+          name: "shot",
+          toolCallId: "t1",
+          content: "done",
+          returnDirect: false,
+          status: "success",
+          attachments: [{ mimeType: "image/png", data: "BBBB" }],
+        },
+      ],
+      context: context(producer),
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messages: [
+          { role: "user", content: "pic", name: undefined },
+          {
+            role: "assistant",
+            content: "ok\n[attachment image/png]",
+            name: undefined,
+          },
+          {
+            role: "assistant",
+            content: "",
+            tool_calls: [
+              {
+                id: "t1",
+                type: "function",
+                function: { name: "shot", arguments: "{}" },
+              },
+            ],
+          },
+          {
+            role: "tool",
+            content: "done\n[attachment image/png]",
+            tool_call_id: "t1",
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "image_url",
+                image_url: { url: "data:image/png;base64,BBBB" },
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  });
 });

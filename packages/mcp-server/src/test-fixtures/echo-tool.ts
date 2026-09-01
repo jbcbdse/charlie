@@ -2,6 +2,7 @@ import {
   BaseTool,
   EventName,
   type ChatAgentContext,
+  type ToolResult,
 } from "@jbcbdse/charlie-core";
 import { z } from "zod";
 
@@ -58,5 +59,18 @@ export class ProgressTool extends BaseTool {
       });
     }
     return JSON.stringify(context.meta);
+  }
+}
+
+/** Returns a PNG attachment for MCP image round-trip tests. */
+export class ImageTool extends BaseTool {
+  public name = "image";
+  public description = "Returns a tiny PNG attachment.";
+  public schema = z.object({});
+  public handler(): ToolResult {
+    return {
+      content: "here",
+      attachments: [{ mimeType: "image/png", data: "AAAA" }],
+    };
   }
 }

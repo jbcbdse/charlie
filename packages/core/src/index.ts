@@ -1,9 +1,10 @@
-export { ITool, BaseTool } from "./base-tool";
+export { ITool, BaseTool, ToolResult, normalizeToolResult } from "./base-tool";
 export { AiChatAgent } from "./ai-chat-agent";
 export { TemplateSerializer } from "./template-serializer";
 export { ToolAssistantFilter } from "./tool-assistant-filter";
 export { ToolExecutor } from "./tool-executor";
 export {
+  Attachment,
   ChatAgent,
   ChatAgentContext,
   ChatAgentGetResponseInput,
@@ -25,6 +26,7 @@ export {
   TextEmbeddingInput,
   TextEmbeddingOutput,
 } from "./types";
+export { AttachmentFormatter } from "./attachment";
 export { ChatRunGenerator } from "./chat-run";
 export {
   CharlieStreamConsumer,

@@ -8,8 +8,15 @@ import {
   CharlieStreamConsumer,
   CharlieStreamPart,
   ToolChoice,
+  AttachmentFormatter,
+  type Attachment,
 } from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutorOptions } from "./openai-chat-executor";
+import {
+  isOpenAiNativeMime,
+  parseDataUrl,
+  toResponsesContent,
+} from "./content-parts";
 
 export type OpenAiResponsesExecutorOptions = OpenAiChatExecutorOptions & {
   maxOutputTokens?: number;
@@ -19,12 +26,15 @@ type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
 export class OpenAiResponsesExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
+  private attachmentFormatter: AttachmentFormatter;
   public modelProvider: string;
   public modelId: string;
   constructor(private options: OpenAiResponsesExecutorOptions) {
     this.options.modelId ??= "gpt-5.4";
     this.modelProvider = options.modelProvider ?? "openai";
     this.modelId = this.options.modelId;
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
     this.openAiClient =
       options.openAiClient ??
       new OpenAI({
@@ -204,6 +214,50 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
               argumentsText: item.arguments,
             };
           }
+          if (item.type === "image_generation_call") {
+            const result = (item as { result?: string }).result;
+            if (result) {
+              yield {
+                type: "attachment",
+                mimeType: "image/png",
+                data: result,
+              };
+            }
+          }
+          if (item.type === "message") {
+            const content = (
+              item as {
+                content?: {
+                  type?: string;
+                  image_url?: string;
+                  result?: string;
+                }[];
+              }
+            ).content;
+            for (const part of content ?? []) {
+              if (part.type !== "output_image" && part.type !== "image") {
+                continue;
+              }
+              if (part.result) {
+                yield {
+                  type: "attachment",
+                  mimeType: "image/png",
+                  data: part.result,
+                };
+                continue;
+              }
+              const parsed = part.image_url
+                ? parseDataUrl(part.image_url)
+                : undefined;
+              if (parsed) {
+                yield {
+                  type: "attachment",
+                  mimeType: parsed.mimeType,
+                  data: parsed.data,
+                };
+              }
+            }
+          }
         }
       }
     }
@@ -211,9 +265,17 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
 
   private toInputItems(messages: ChatMessage[]): ResponseInputItem[] {
     const items: ResponseInputItem[] = [];
+    const deferred: Attachment[] = [];
     for (const msg of messages) {
       if (msg.role === "user") {
-        items.push({ role: "user", content: msg.content });
+        items.push({
+          role: "user",
+          content: toResponsesContent(
+            msg.content,
+            msg.attachments,
+            this.attachmentFormatter,
+          ),
+        } as ResponseInputItem);
         continue;
       }
       if (msg.role === "system") {
@@ -221,7 +283,10 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
         continue;
       }
       if (msg.role === "assistant") {
-        items.push({ role: "assistant", content: msg.content });
+        items.push({
+          role: "assistant",
+          content: this.attachmentFormatter.messageTextWithPlaceholders(msg),
+        });
         continue;
       }
       if (msg.role === "reasoning") {
@@ -249,12 +314,23 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
         items.push({
           type: "function_call_output",
           call_id: msg.toolCallId,
-          output: msg.content,
+          output: this.attachmentFormatter.messageTextWithPlaceholders(msg),
         });
+        deferred.push(
+          ...(msg.attachments ?? []).filter((a) =>
+            isOpenAiNativeMime(a.mimeType, this.attachmentFormatter),
+          ),
+        );
         continue;
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       throw new Error(`Unknown message role: ${(msg as any)?.role}`);
+    }
+    if (deferred.length) {
+      items.push({
+        role: "user",
+        content: toResponsesContent("", deferred, this.attachmentFormatter),
+      } as ResponseInputItem);
     }
     return items;
   }

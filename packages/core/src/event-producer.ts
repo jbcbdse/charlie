@@ -95,6 +95,12 @@ export type StreamChunk =
       id?: string;
       name?: string;
       argumentsText?: string;
+    }
+  | {
+      type: "attachment";
+      mimeType: string;
+      data: string | Uint8Array;
+      name?: string;
     };
 
 export interface EventChatStreamChunk extends ChatEvent {

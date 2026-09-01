@@ -109,9 +109,23 @@ The `TextEmbeddingGenerator` interface is simple to implement. There are 3 imple
 
 Generated embeddings are specific to the model, and the generator should always return the `modelId` as part of its response. But having a common, simple interface might allow you to swap in different embedding generators into your application and A/B test different models in your own vector store.
 
-## Image generation
+## Attachments
 
-TBD
+User, assistant, and tool messages may include `attachments?: Attachment[]`. Each attachment has a `mimeType` and `data` (base64 string or `Uint8Array`). Executors map attachments to the vendor media block when that API supports the MIME type; otherwise they append `[attachment image/png]` (or similar) to the text. Streamed media arrives as `chat:stream:chunk` parts with `type: "attachment"` and is folded onto the assistant message.
+
+```ts
+await agent.getResponse({
+  messages: [
+    {
+      role: "user",
+      content: "What is in this image?",
+      attachments: [{ mimeType: "image/png", data: pngBytes }],
+    },
+  ],
+});
+```
+
+Tools may return `{ content, attachments }` so images from tools (including MCP) round-trip into history. Charlie does not enable provider image-generation tools or response modalities on its own; if a model already returns media in the chat stream, it is stored as attachments.
 
 ## Other model types
 

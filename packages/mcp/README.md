@@ -34,4 +34,4 @@ await mcp.close();
 
 MCP servers are trusted local processes: `MCP_CONFIG` runs whatever `command` you give it (`shell: false`). The SDK only forwards a small env allowlist plus explicit `env` keys — it does not expand `${VAR}`. Tool results, resource bodies, and prompt text are passed through to the model as-is.
 
-Out of scope: OAuth, elicitation, sampling, subscriptions, SSE fallback, and `tools/list_changed`. Images/audio flatten to placeholders because Charlie tool results are strings. For the reverse direction — exposing Charlie tools as an MCP server — see `@jbcbdse/charlie-mcp-server`.
+Out of scope: OAuth, elicitation, sampling, subscriptions, SSE fallback, and `tools/list_changed`. Image blocks with bytes become Charlie `attachments`; audio without bytes still flattens to placeholders. For the reverse direction — exposing Charlie tools as an MCP server — see `@jbcbdse/charlie-mcp-server`.

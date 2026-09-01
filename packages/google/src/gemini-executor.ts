@@ -95,10 +95,18 @@ export class GeminiExecutor implements ChatExecutor {
         thought?: boolean;
         text?: string;
         functionCall?: { name: string; args?: Record<string, unknown> };
+        inlineData?: { mimeType?: string; data?: string };
       }[]) {
         if (part.thought && part.text) {
           yield { type: "thinking", text: part.text };
           continue;
+        }
+        if (part.inlineData?.data) {
+          yield {
+            type: "attachment",
+            mimeType: part.inlineData.mimeType || "application/octet-stream",
+            data: part.inlineData.data,
+          };
         }
         if (part.text) {
           yield { type: "text", text: part.text };

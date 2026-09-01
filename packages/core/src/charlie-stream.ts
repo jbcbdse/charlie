@@ -1,8 +1,10 @@
 import { EventName, StreamChunk } from "./event-producer";
 import {
+  Attachment,
   ChatAgentContext,
   ChatAgentGetResponseOutput,
   ChatMessage,
+  MessageAssistant,
   MessageReasoning,
   TokenUsage,
 } from "./types";
@@ -37,6 +39,7 @@ export class CharlieStreamConsumer {
     { id: string; name: string; arguments: string }
   >();
   private text = "";
+  private attachments: Attachment[] = [];
   private usagePart: CharlieUsagePart | undefined;
 
   constructor(
@@ -50,7 +53,7 @@ export class CharlieStreamConsumer {
     for await (const part of parts) {
       this.applyPart(part);
     }
-    this.flushText();
+    this.flushAssistant();
     this.flushTools();
     if (this.responseMessages.length === 0) {
       this.responseMessages.push({ role: "assistant", content: "" });
@@ -78,7 +81,7 @@ export class CharlieStreamConsumer {
       return;
     }
     if (part.type === "reasoning") {
-      this.flushText();
+      this.flushAssistant();
       this.flushTools();
       const reasoning: MessageReasoning = { role: "reasoning" };
       if (part.id) reasoning.id = part.id;
@@ -95,6 +98,16 @@ export class CharlieStreamConsumer {
       return;
     }
     if (part.type === "thinking") {
+      this.emit(part);
+      return;
+    }
+    if (part.type === "attachment") {
+      const attachment: Attachment = {
+        mimeType: part.mimeType,
+        data: part.data,
+      };
+      if (part.name) attachment.name = part.name;
+      this.attachments.push(attachment);
       this.emit(part);
       return;
     }
@@ -119,10 +132,15 @@ export class CharlieStreamConsumer {
     });
   }
 
-  private flushText(): void {
-    if (!this.text) return;
-    this.responseMessages.push({ role: "assistant", content: this.text });
+  private flushAssistant(): void {
+    if (!this.text && this.attachments.length === 0) return;
+    const message: MessageAssistant = { role: "assistant", content: this.text };
+    if (this.attachments.length > 0) {
+      message.attachments = this.attachments;
+    }
+    this.responseMessages.push(message);
     this.text = "";
+    this.attachments = [];
   }
 
   private flushTools(): void {

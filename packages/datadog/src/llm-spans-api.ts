@@ -8,6 +8,7 @@ import {
   EventChatExecutorEnd,
   EventChatStart,
   EventToolEnd,
+  AttachmentFormatter,
 } from "@jbcbdse/charlie-core";
 import { v4 as uuid } from "uuid";
 
@@ -102,12 +103,16 @@ export class LlmSpansApi {
   private tags: Record<string, string>;
   private runs = new Map<string, RunData>();
   private readonly minDuration = 1_000; // 1µs in nanoseconds
+  private readonly attachmentFormatter: AttachmentFormatter;
 
   constructor(options: {
     apiKey: string;
     axiosInstance?: AxiosInstance;
     tags?: Record<string, string>;
+    attachmentFormatter?: AttachmentFormatter;
   }) {
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
     this.axiosInstance =
       options.axiosInstance ??
       axios.create({
@@ -272,10 +277,10 @@ export class LlmSpansApi {
 
   private toMessage(msg: ChatMessage): Message | Message[] {
     if (msg.role === "assistant") {
-      return { content: msg.content, role: "assistant" };
+      return { content: this.attachmentFormatter.messageTextWithPlaceholders(msg), role: "assistant" };
     }
     if (msg.role === "user") {
-      return { content: msg.content, role: "user" };
+      return { content: this.attachmentFormatter.messageTextWithPlaceholders(msg), role: "user" };
     }
     if (msg.role === "system") {
       return { content: msg.content, role: "system" };
@@ -289,7 +294,7 @@ export class LlmSpansApi {
       });
     }
     if (msg.role === "tool") {
-      return { content: msg.content, role: "tool" };
+      return { content: this.attachmentFormatter.messageTextWithPlaceholders(msg), role: "tool" };
     }
     if (msg.role === "reasoning") {
       return { content: msg.content ?? "", role: "reasoning" };

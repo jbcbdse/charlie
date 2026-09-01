@@ -12,6 +12,8 @@ import {
   EventName,
   EventSubscriber,
   eventProducer as defaultEventProducer,
+  AttachmentFormatter,
+  normalizeToolResult,
   type ChatAgentContext,
   type EventProducer,
   type EventTypeMap,
@@ -56,6 +58,7 @@ export interface CharlieMcpServerOptions {
    * chat-loop/`ToolExecutor` concept and are never emitted here.
    */
   eventProducer?: EventProducer;
+  attachmentFormatter?: AttachmentFormatter;
 }
 
 /**
@@ -80,10 +83,13 @@ export class CharlieMcpServer {
   >();
   private readonly toolsByName: Map<string, ITool>;
   private readonly eventProducer: EventProducer;
+  private readonly attachmentFormatter: AttachmentFormatter;
 
   constructor(private readonly options: CharlieMcpServerOptions) {
     this.toolsByName = this.toolsByUniqueName(options.tools);
     this.eventProducer = options.eventProducer ?? defaultEventProducer;
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
   }
 
   /**
@@ -166,8 +172,27 @@ export class CharlieMcpServer {
         ? undefined
         : this.forwardToolProgress(context, extra, progressToken);
     try {
-      const text = await tool.handle(params.arguments ?? {}, context);
-      return { content: [{ type: "text", text }] };
+      const result = await tool.handle(params.arguments ?? {}, context);
+      const { content, attachments } = normalizeToolResult(result);
+      const blocks: CallToolResult["content"] = [];
+      if (content) {
+        blocks.push({ type: "text", text: content });
+      }
+      for (const attachment of attachments ?? []) {
+        if (this.attachmentFormatter.isImageMimeType(attachment.mimeType)) {
+          blocks.push({
+            type: "image",
+            mimeType: attachment.mimeType,
+            data: this.attachmentFormatter.base64(attachment),
+          });
+        } else {
+          blocks.push({
+            type: "text",
+            text: this.attachmentFormatter.placeholder(attachment),
+          });
+        }
+      }
+      return { content: blocks.length ? blocks : [{ type: "text", text: "" }] };
     } catch (error) {
       return {
         content: [

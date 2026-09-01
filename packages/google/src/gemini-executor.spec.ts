@@ -153,4 +153,71 @@ describe("GeminiExecutor streaming", () => {
       }),
     );
   });
+
+  it("maps streamed inlineData onto assistant attachments", async () => {
+    const generateContentStream = jest.fn().mockResolvedValue({
+      stream: {
+        async *[Symbol.asyncIterator]() {
+          yield {
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    { text: "see" },
+                    { inlineData: { mimeType: "image/png", data: "AAAA" } },
+                  ],
+                },
+              },
+            ],
+          };
+        },
+      },
+      response: Promise.resolve({}),
+    });
+    const executor = new GeminiExecutor({
+      modelId: "gemini-test",
+      apiKey: "test",
+    });
+    (
+      executor as unknown as { model: { generateContentStream: unknown } }
+    ).model = { generateContentStream };
+    const result = await executor.execute({
+      messages: [
+        {
+          role: "user",
+          content: "look",
+          attachments: [{ mimeType: "image/png", data: "BBBB" }],
+        },
+      ],
+      context: {
+        runId: "run-1",
+        modelId: "gemini-test",
+        messages: [],
+        tools: [],
+        mustCallTool: false,
+        meta: {},
+        eventProducer: new EventProducer(),
+      },
+    });
+    expect(generateContentStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: "look" },
+              { inlineData: { mimeType: "image/png", data: "BBBB" } },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.responseMessages).toEqual([
+      {
+        role: "assistant",
+        content: "see",
+        attachments: [{ mimeType: "image/png", data: "AAAA" }],
+      },
+    ]);
+  });
 });

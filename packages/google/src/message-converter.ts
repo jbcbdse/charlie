@@ -1,7 +1,14 @@
 import { Content, Part } from "@google/generative-ai";
-import { ChatMessage } from "@jbcbdse/charlie-core";
+import {
+  Attachment,
+  AttachmentFormatter,
+  ChatMessage,
+} from "@jbcbdse/charlie-core";
 
 export class MessageConverter {
+  constructor(
+    private readonly attachmentFormatter: AttachmentFormatter = new AttachmentFormatter(),
+  ) {}
   public toContentObjects(messages: ChatMessage[]): Content[] {
     const contents = this.condense(
       messages
@@ -26,21 +33,13 @@ export class MessageConverter {
     if (message.role === "assistant") {
       return {
         role: "model",
-        parts: [
-          {
-            text: message.content,
-          },
-        ],
+        parts: this.toParts(message.content, message.attachments),
       };
     }
     if (message.role == "user") {
       return {
         role: "user",
-        parts: [
-          {
-            text: message.content,
-          },
-        ],
+        parts: this.toParts(message.content, message.attachments),
       };
     }
     if (message.role === "system") {
@@ -65,6 +64,9 @@ export class MessageConverter {
               response: { [key]: message.content },
             },
           },
+          ...this.toParts("", message.attachments).filter(
+            (part) => !("text" in part && part.text === ""),
+          ),
         ],
       };
     }
@@ -89,6 +91,23 @@ export class MessageConverter {
     const messages: ChatMessage[] = [];
     for (const part of content.parts ?? []) {
       if ("thought" in part && part.thought) {
+        continue;
+      }
+      if (part.inlineData?.data) {
+        const last = messages[messages.length - 1];
+        const attachment: Attachment = {
+          mimeType: part.inlineData.mimeType || "application/octet-stream",
+          data: part.inlineData.data,
+        };
+        if (last?.role === "assistant") {
+          last.attachments = [...(last.attachments ?? []), attachment];
+        } else {
+          messages.push({
+            role: "assistant",
+            content: "",
+            attachments: [attachment],
+          });
+        }
         continue;
       }
       if (part.text) {
@@ -118,5 +137,40 @@ export class MessageConverter {
       }
     }
     return messages;
+  }
+
+  private toParts(text: string, attachments?: Attachment[]): Part[] {
+    const parts: Part[] = [];
+    const unsupported: Attachment[] = [];
+    for (const attachment of attachments ?? []) {
+      if (this.isGeminiInlineMime(attachment.mimeType)) {
+        parts.push({
+          inlineData: {
+            mimeType: attachment.mimeType,
+            data: this.attachmentFormatter.base64(attachment),
+          },
+        });
+      } else {
+        unsupported.push(attachment);
+      }
+    }
+    const withPlaceholders = this.attachmentFormatter.textWithUnsupported(
+      text,
+      unsupported,
+    );
+    if (withPlaceholders) {
+      parts.unshift({ text: withPlaceholders });
+    }
+    return parts.length ? parts : [{ text: "" }];
+  }
+
+  private isGeminiInlineMime(mimeType: string): boolean {
+    const mime = mimeType.toLowerCase();
+    return (
+      this.attachmentFormatter.isImageMimeType(mime) ||
+      mime.startsWith("audio/") ||
+      mime.startsWith("video/") ||
+      mime === "application/pdf"
+    );
   }
 }

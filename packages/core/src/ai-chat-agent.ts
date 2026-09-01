@@ -177,6 +177,9 @@ export class AiChatAgent implements ChatAgent {
             role: "assistant",
             content: directResponse.content,
           };
+          if (directResponse.attachments) {
+            directMessage.attachments = directResponse.attachments;
+          }
           responseMessages.push(directMessage);
           doLoop = false;
         }

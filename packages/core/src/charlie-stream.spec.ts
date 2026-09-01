@@ -92,6 +92,37 @@ describe("CharlieStreamConsumer", () => {
     expect(result.responseMessage.role).toBe("tool_call");
   });
 
+  it("folds attachment parts onto the assistant message", async () => {
+    const producer = new EventProducer();
+    const chunks: StreamChunk[] = [];
+    producer.emitter.on(EventName.ChatStreamChunk, (event) => {
+      chunks.push(event.chunk);
+    });
+    const result = await consume(producer, [
+      { type: "text", text: "see " },
+      { type: "text", text: "this" },
+      {
+        type: "attachment",
+        mimeType: "image/png",
+        data: "AAAA",
+        name: "dot.png",
+      },
+    ]);
+    expect(result.responseMessages).toEqual([
+      {
+        role: "assistant",
+        content: "see this",
+        attachments: [{ mimeType: "image/png", data: "AAAA", name: "dot.png" }],
+      },
+    ]);
+    expect(chunks).toContainEqual({
+      type: "attachment",
+      mimeType: "image/png",
+      data: "AAAA",
+      name: "dot.png",
+    });
+  });
+
   it("throws yielded errors and falls back to an empty assistant", async () => {
     const producer = new EventProducer();
     await expect(

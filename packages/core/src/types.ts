@@ -27,6 +27,18 @@ export interface MessageSystem {
   name?: string;
 }
 /**
+ * Binary media on a chat message (image, PDF, etc.).
+ *
+ * `data` is base64 (JSON history / HTTP) or raw bytes. Node `Buffer` is a
+ * `Uint8Array`. Executors map this to the vendor media block when the API
+ * supports the MIME type; otherwise they leave a text placeholder.
+ */
+export interface Attachment {
+  mimeType: string;
+  data: string | Uint8Array;
+  name?: string;
+}
+/**
  * A user message in the chat
  *
  * This is a message from the user in the conversation. Depending on the use case, this may not be a literal message from the user, but a message that represents the user's intent as derived by the system or summarized message history
@@ -34,6 +46,7 @@ export interface MessageSystem {
 export interface MessageUser {
   role: "user";
   content: string;
+  attachments?: Attachment[];
   /** The name of the specific actor in this role, possibly not supported by all agents */
   name?: string;
 }
@@ -47,6 +60,7 @@ export interface MessageUser {
 export interface MessageAssistant {
   role: "assistant";
   content: string;
+  attachments?: Attachment[];
   /** The name of the specific actor in this role, possibly not supported by all agents */
   name?: string;
 }
@@ -84,6 +98,7 @@ export interface ToolCall {
 export interface MessageTool {
   role: "tool";
   content: string;
+  attachments?: Attachment[];
   /** The name of the tool that was called */
   name: string;
   toolCallId: string;

@@ -18,6 +18,7 @@ import {
 import { InlineToolCallParser } from "./inline-tool-call-parser";
 import { ToolPromptGenerator } from "./tool-prompt-generator";
 import { MessageConverter } from "./message-converter";
+import { mimeTypeFromBedrockImageFormat } from "./content-blocks";
 export type BedrockClientCredentials =
   BedrockRuntimeClientConfig["credentials"];
 export class BedrockChatExecutor implements ChatExecutor {
@@ -199,6 +200,15 @@ export class BedrockChatExecutor implements ChatExecutor {
       }
       if (contentBlock.text) {
         parts.push({ type: "text", text: contentBlock.text });
+        return;
+      }
+      if (contentBlock.image?.source?.bytes) {
+        const bytes = contentBlock.image.source.bytes;
+        parts.push({
+          type: "attachment",
+          mimeType: mimeTypeFromBedrockImageFormat(contentBlock.image.format),
+          data: bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes),
+        });
         return;
       }
       if (contentBlock.toolUse) {
