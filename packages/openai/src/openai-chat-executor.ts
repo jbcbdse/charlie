@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { OpenAiChatMessage, OpenAiCompletionsRequest } from "./types";
 import {
   Attachment,
+  AttachmentFormatter,
   ChatExecutor,
   ChatAgentGetResponseOutput,
   ChatMessage,
@@ -11,7 +12,6 @@ import {
   CharlieStreamConsumer,
   CharlieStreamPart,
   ToolChoice,
-  messageTextWithPlaceholders,
 } from "@jbcbdse/charlie-core";
 import {
   isOpenAiNativeMime,
@@ -23,6 +23,7 @@ export interface OpenAiChatExecutorOptions {
   modelProvider?: string;
   modelId: string;
   promptSerializer?: TemplateSerializer;
+  attachmentFormatter?: AttachmentFormatter;
   openAiClient?: OpenAI;
   apiKey?: string | (() => Promise<string>);
   baseURL?: string;
@@ -32,12 +33,15 @@ export interface OpenAiChatExecutorOptions {
 }
 export class OpenAiChatExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
+  private attachmentFormatter: AttachmentFormatter;
   public modelProvider: string;
   public modelId: string;
   constructor(private options: OpenAiChatExecutorOptions) {
     this.options.modelId ??= "o4-mini";
     this.modelProvider = options.modelProvider ?? "openai";
     this.modelId = this.options.modelId;
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
     this.openAiClient =
       options.openAiClient ??
       new OpenAI({
@@ -208,7 +212,11 @@ export class OpenAiChatExecutor implements ChatExecutor {
       if (msg.role === "user") {
         out.push({
           role: "user",
-          content: toOpenAiContent(msg.content, msg.attachments),
+          content: toOpenAiContent(
+            msg.content,
+            msg.attachments,
+            this.attachmentFormatter,
+          ),
           name: msg.name,
         });
         continue;
@@ -239,7 +247,7 @@ export class OpenAiChatExecutor implements ChatExecutor {
       if (msg.role === "assistant") {
         out.push({
           role: "assistant",
-          content: messageTextWithPlaceholders(msg),
+          content: this.attachmentFormatter.messageTextWithPlaceholders(msg),
           name: msg.name,
         });
         continue;
@@ -247,12 +255,12 @@ export class OpenAiChatExecutor implements ChatExecutor {
       if (msg.role === "tool") {
         out.push({
           role: "tool",
-          content: messageTextWithPlaceholders(msg),
+          content: this.attachmentFormatter.messageTextWithPlaceholders(msg),
           tool_call_id: msg.toolCallId,
         });
         deferred.push(
           ...(msg.attachments ?? []).filter((a) =>
-            isOpenAiNativeMime(a.mimeType),
+            isOpenAiNativeMime(a.mimeType, this.attachmentFormatter),
           ),
         );
         continue;
@@ -261,7 +269,10 @@ export class OpenAiChatExecutor implements ChatExecutor {
       throw new Error(`Unknown message role: ${(msg as any)?.role}`);
     }
     if (deferred.length) {
-      out.push({ role: "user", content: toOpenAiContent("", deferred) });
+      out.push({
+        role: "user",
+        content: toOpenAiContent("", deferred, this.attachmentFormatter),
+      });
     }
     return out;
   }

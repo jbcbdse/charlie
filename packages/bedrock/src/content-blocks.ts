@@ -1,8 +1,6 @@
 import {
   Attachment,
-  attachmentBytes,
-  isImageMimeType,
-  textWithUnsupportedAttachments,
+  AttachmentFormatter,
 } from "@jbcbdse/charlie-core";
 import type { ContentBlock } from "@aws-sdk/client-bedrock-runtime";
 
@@ -39,7 +37,8 @@ function documentName(): string {
 
 export function toBedrockContentBlocks(
   text: string,
-  attachments?: Attachment[],
+  attachments: Attachment[] | undefined,
+  formatter: AttachmentFormatter,
 ): ContentBlock[] {
   const blocks: ContentBlock[] = [];
   const unsupported: Attachment[] = [];
@@ -50,7 +49,7 @@ export function toBedrockContentBlocks(
       blocks.push({
         image: {
           format: imageFormat,
-          source: { bytes: attachmentBytes(attachment) },
+          source: { bytes: formatter.bytes(attachment) },
         },
       });
       continue;
@@ -61,14 +60,14 @@ export function toBedrockContentBlocks(
         document: {
           format: documentFormat,
           name: documentName(),
-          source: { bytes: attachmentBytes(attachment) },
+          source: { bytes: formatter.bytes(attachment) },
         },
       });
       continue;
     }
     unsupported.push(attachment);
   }
-  const withPlaceholders = textWithUnsupportedAttachments(text, unsupported);
+  const withPlaceholders = formatter.textWithUnsupported(text, unsupported);
   if (withPlaceholders) {
     blocks.unshift({ text: withPlaceholders });
   } else if (blocks.length === 0) {
@@ -84,6 +83,6 @@ export function mimeTypeFromBedrockImageFormat(
   if (format === "png") return "image/png";
   if (format === "gif") return "image/gif";
   if (format === "webp") return "image/webp";
-  if (format && isImageMimeType(format)) return format;
+  if (format && format.toLowerCase().startsWith("image/")) return format;
   return "application/octet-stream";
 }

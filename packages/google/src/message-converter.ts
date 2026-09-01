@@ -1,12 +1,14 @@
 import { Content, Part } from "@google/generative-ai";
 import {
   Attachment,
-  attachmentBase64,
+  AttachmentFormatter,
   ChatMessage,
-  textWithUnsupportedAttachments,
 } from "@jbcbdse/charlie-core";
 
 export class MessageConverter {
+  constructor(
+    private readonly attachmentFormatter: AttachmentFormatter = new AttachmentFormatter(),
+  ) {}
   public toContentObjects(messages: ChatMessage[]): Content[] {
     const contents = this.condense(
       messages
@@ -145,14 +147,17 @@ export class MessageConverter {
         parts.push({
           inlineData: {
             mimeType: attachment.mimeType,
-            data: attachmentBase64(attachment),
+            data: this.attachmentFormatter.base64(attachment),
           },
         });
       } else {
         unsupported.push(attachment);
       }
     }
-    const withPlaceholders = textWithUnsupportedAttachments(text, unsupported);
+    const withPlaceholders = this.attachmentFormatter.textWithUnsupported(
+      text,
+      unsupported,
+    );
     if (withPlaceholders) {
       parts.unshift({ text: withPlaceholders });
     }
@@ -162,7 +167,7 @@ export class MessageConverter {
   private isGeminiInlineMime(mimeType: string): boolean {
     const mime = mimeType.toLowerCase();
     return (
-      mime.startsWith("image/") ||
+      this.attachmentFormatter.isImageMimeType(mime) ||
       mime.startsWith("audio/") ||
       mime.startsWith("video/") ||
       mime === "application/pdf"

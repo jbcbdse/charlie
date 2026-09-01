@@ -12,9 +12,7 @@ import {
   EventName,
   EventSubscriber,
   eventProducer as defaultEventProducer,
-  attachmentBase64,
-  attachmentPlaceholder,
-  isImageMimeType,
+  AttachmentFormatter,
   normalizeToolResult,
   type ChatAgentContext,
   type EventProducer,
@@ -60,6 +58,7 @@ export interface CharlieMcpServerOptions {
    * chat-loop/`ToolExecutor` concept and are never emitted here.
    */
   eventProducer?: EventProducer;
+  attachmentFormatter?: AttachmentFormatter;
 }
 
 /**
@@ -84,10 +83,13 @@ export class CharlieMcpServer {
   >();
   private readonly toolsByName: Map<string, ITool>;
   private readonly eventProducer: EventProducer;
+  private readonly attachmentFormatter: AttachmentFormatter;
 
   constructor(private readonly options: CharlieMcpServerOptions) {
     this.toolsByName = this.toolsByUniqueName(options.tools);
     this.eventProducer = options.eventProducer ?? defaultEventProducer;
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
   }
 
   /**
@@ -177,16 +179,16 @@ export class CharlieMcpServer {
         blocks.push({ type: "text", text: content });
       }
       for (const attachment of attachments ?? []) {
-        if (isImageMimeType(attachment.mimeType)) {
+        if (this.attachmentFormatter.isImageMimeType(attachment.mimeType)) {
           blocks.push({
             type: "image",
             mimeType: attachment.mimeType,
-            data: attachmentBase64(attachment),
+            data: this.attachmentFormatter.base64(attachment),
           });
         } else {
           blocks.push({
             type: "text",
-            text: attachmentPlaceholder(attachment),
+            text: this.attachmentFormatter.placeholder(attachment),
           });
         }
       }

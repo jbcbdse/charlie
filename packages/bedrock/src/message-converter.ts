@@ -1,11 +1,21 @@
-import { ChatMessage, messageTextWithPlaceholders } from "@jbcbdse/charlie-core";
+import {
+  Attachment,
+  AttachmentFormatter,
+  ChatMessage,
+} from "@jbcbdse/charlie-core";
 import { ContentBlock, Message } from "@aws-sdk/client-bedrock-runtime";
 import { toBedrockContentBlocks } from "./content-blocks";
 
 export class MessageConverter {
   private toolsSupported: boolean;
-  public constructor(options: { toolsSupported: boolean }) {
+  private attachmentFormatter: AttachmentFormatter;
+  public constructor(options: {
+    toolsSupported: boolean;
+    attachmentFormatter?: AttachmentFormatter;
+  }) {
     this.toolsSupported = options.toolsSupported ?? true;
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
   }
   public toBedrockMessages(messages: ChatMessage[]): Message[] {
     const bedrockMessages = messages
@@ -14,12 +24,20 @@ export class MessageConverter {
     return this.normalizeBedrockMessages(bedrockMessages);
   }
 
+  private contentBlocks(text: string, attachments?: Attachment[]) {
+    return toBedrockContentBlocks(
+      text,
+      attachments,
+      this.attachmentFormatter,
+    );
+  }
+
   private toBedrockMessage(msg: ChatMessage): Message {
     if (msg.role === "user") {
       const content = msg.content.replace(/<\/?system>/, "");
       return {
         role: "user",
-        content: toBedrockContentBlocks(content, msg.attachments),
+        content: this.contentBlocks(content, msg.attachments),
       };
     }
     if (msg.role === "system") {
@@ -31,8 +49,8 @@ export class MessageConverter {
     if (msg.role === "assistant") {
       return {
         role: "assistant",
-        content: toBedrockContentBlocks(
-          messageTextWithPlaceholders(msg),
+        content: this.contentBlocks(
+          this.attachmentFormatter.messageTextWithPlaceholders(msg),
         ),
       };
     }
@@ -61,7 +79,7 @@ export class MessageConverter {
       if (!this.toolsSupported) {
         return {
           role: "user",
-          content: toBedrockContentBlocks(
+          content: this.contentBlocks(
             `<system>${msg.status === "success" ? "Successful" : "Failed"} tool result for ${msg.name} tool call: ${msg.content}</system>`,
             msg.attachments,
           ),
@@ -72,7 +90,7 @@ export class MessageConverter {
         content: [
           {
             toolResult: {
-              content: toBedrockContentBlocks(
+              content: this.contentBlocks(
                 msg.content,
                 msg.attachments,
               ) as NonNullable<

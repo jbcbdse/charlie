@@ -8,7 +8,7 @@ import {
   CharlieStreamConsumer,
   CharlieStreamPart,
   ToolChoice,
-  messageTextWithPlaceholders,
+  AttachmentFormatter,
   type Attachment,
 } from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutorOptions } from "./openai-chat-executor";
@@ -26,12 +26,15 @@ type ResponseInputItem = OpenAI.Responses.ResponseInputItem;
 
 export class OpenAiResponsesExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
+  private attachmentFormatter: AttachmentFormatter;
   public modelProvider: string;
   public modelId: string;
   constructor(private options: OpenAiResponsesExecutorOptions) {
     this.options.modelId ??= "gpt-5.4";
     this.modelProvider = options.modelProvider ?? "openai";
     this.modelId = this.options.modelId;
+    this.attachmentFormatter =
+      options.attachmentFormatter ?? new AttachmentFormatter();
     this.openAiClient =
       options.openAiClient ??
       new OpenAI({
@@ -267,7 +270,11 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       if (msg.role === "user") {
         items.push({
           role: "user",
-          content: toResponsesContent(msg.content, msg.attachments),
+          content: toResponsesContent(
+            msg.content,
+            msg.attachments,
+            this.attachmentFormatter,
+          ),
         } as ResponseInputItem);
         continue;
       }
@@ -278,7 +285,7 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
       if (msg.role === "assistant") {
         items.push({
           role: "assistant",
-          content: messageTextWithPlaceholders(msg),
+          content: this.attachmentFormatter.messageTextWithPlaceholders(msg),
         });
         continue;
       }
@@ -307,11 +314,11 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
         items.push({
           type: "function_call_output",
           call_id: msg.toolCallId,
-          output: messageTextWithPlaceholders(msg),
+          output: this.attachmentFormatter.messageTextWithPlaceholders(msg),
         });
         deferred.push(
           ...(msg.attachments ?? []).filter((a) =>
-            isOpenAiNativeMime(a.mimeType),
+            isOpenAiNativeMime(a.mimeType, this.attachmentFormatter),
           ),
         );
         continue;
@@ -322,7 +329,7 @@ export class OpenAiResponsesExecutor implements ChatExecutor {
     if (deferred.length) {
       items.push({
         role: "user",
-        content: toResponsesContent("", deferred),
+        content: toResponsesContent("", deferred, this.attachmentFormatter),
       } as ResponseInputItem);
     }
     return items;

@@ -26,15 +26,7 @@ export {
   TextEmbeddingInput,
   TextEmbeddingOutput,
 } from "./types";
-export {
-  attachmentBase64,
-  attachmentBytes,
-  attachmentDataUrl,
-  attachmentPlaceholder,
-  isImageMimeType,
-  messageTextWithPlaceholders,
-  textWithUnsupportedAttachments,
-} from "./attachment";
+export { AttachmentFormatter } from "./attachment";
 export { ChatRunGenerator } from "./chat-run";
 export {
   CharlieStreamConsumer,

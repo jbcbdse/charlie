@@ -1,8 +1,6 @@
 import {
   Attachment,
-  attachmentDataUrl,
-  isImageMimeType,
-  textWithUnsupportedAttachments,
+  AttachmentFormatter,
 } from "@jbcbdse/charlie-core";
 
 export type OpenAiContentPart =
@@ -14,13 +12,17 @@ function isOpenAiFileMime(mimeType: string): boolean {
   return mimeType.toLowerCase() === "application/pdf";
 }
 
-export function isOpenAiNativeMime(mimeType: string): boolean {
-  return isImageMimeType(mimeType) || isOpenAiFileMime(mimeType);
+export function isOpenAiNativeMime(
+  mimeType: string,
+  formatter: AttachmentFormatter,
+): boolean {
+  return formatter.isImageMimeType(mimeType) || isOpenAiFileMime(mimeType);
 }
 
 export function toOpenAiContent(
   text: string,
-  attachments?: Attachment[],
+  attachments: Attachment[] | undefined,
+  formatter: AttachmentFormatter,
 ): string | OpenAiContentPart[] {
   if (!attachments?.length) {
     return text;
@@ -28,24 +30,24 @@ export function toOpenAiContent(
   const parts: OpenAiContentPart[] = [];
   const unsupported: Attachment[] = [];
   for (const attachment of attachments) {
-    if (isImageMimeType(attachment.mimeType)) {
+    if (formatter.isImageMimeType(attachment.mimeType)) {
       parts.push({
         type: "image_url",
-        image_url: { url: attachmentDataUrl(attachment) },
+        image_url: { url: formatter.dataUrl(attachment) },
       });
     } else if (isOpenAiFileMime(attachment.mimeType)) {
       parts.push({
         type: "file",
         file: {
           filename: attachment.name ?? "file.pdf",
-          file_data: attachmentDataUrl(attachment),
+          file_data: formatter.dataUrl(attachment),
         },
       });
     } else {
       unsupported.push(attachment);
     }
   }
-  const withPlaceholders = textWithUnsupportedAttachments(text, unsupported);
+  const withPlaceholders = formatter.textWithUnsupported(text, unsupported);
   if (withPlaceholders) {
     parts.unshift({ type: "text", text: withPlaceholders });
   }
@@ -59,7 +61,8 @@ export type ResponsesInputPart =
 
 export function toResponsesContent(
   text: string,
-  attachments?: Attachment[],
+  attachments: Attachment[] | undefined,
+  formatter: AttachmentFormatter,
 ): string | ResponsesInputPart[] {
   if (!attachments?.length) {
     return text;
@@ -67,23 +70,23 @@ export function toResponsesContent(
   const parts: ResponsesInputPart[] = [];
   const unsupported: Attachment[] = [];
   for (const attachment of attachments) {
-    if (isImageMimeType(attachment.mimeType)) {
+    if (formatter.isImageMimeType(attachment.mimeType)) {
       parts.push({
         type: "input_image",
-        image_url: attachmentDataUrl(attachment),
+        image_url: formatter.dataUrl(attachment),
         detail: "auto",
       });
     } else if (isOpenAiFileMime(attachment.mimeType)) {
       parts.push({
         type: "input_file",
         filename: attachment.name ?? "file.pdf",
-        file_data: attachmentDataUrl(attachment),
+        file_data: formatter.dataUrl(attachment),
       });
     } else {
       unsupported.push(attachment);
     }
   }
-  const withPlaceholders = textWithUnsupportedAttachments(text, unsupported);
+  const withPlaceholders = formatter.textWithUnsupported(text, unsupported);
   if (withPlaceholders) {
     parts.unshift({ type: "input_text", text: withPlaceholders });
   }

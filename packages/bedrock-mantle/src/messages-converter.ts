@@ -1,10 +1,8 @@
 import {
   Attachment,
-  attachmentBase64,
+  AttachmentFormatter,
   ChatMessage,
   MessageToolCall,
-  messageTextWithPlaceholders,
-  textWithUnsupportedAttachments,
 } from "@jbcbdse/charlie-core";
 
 interface ThinkingBlock {
@@ -73,6 +71,9 @@ interface ResponseBlock {
 }
 
 export class MantleMessagesConverter {
+  constructor(
+    private readonly attachmentFormatter: AttachmentFormatter = new AttachmentFormatter(),
+  ) {}
   public toMessages(messages: ChatMessage[]): MantleMessageParam[] {
     const result: MantleMessageParam[] = [];
     let assistantBlocks: ContentBlockParam[] = [];
@@ -122,7 +123,8 @@ export class MantleMessagesConverter {
       }
       if (msg.role === "assistant") {
         flushToolResults();
-        const text = messageTextWithPlaceholders(msg);
+        const text =
+          this.attachmentFormatter.messageTextWithPlaceholders(msg);
         if (text) {
           assistantBlocks.push({ type: "text", text });
         }
@@ -277,7 +279,7 @@ export class MantleMessagesConverter {
           source: {
             type: "base64",
             media_type: imageMedia,
-            data: attachmentBase64(attachment),
+            data: this.attachmentFormatter.base64(attachment),
           },
         });
       } else if (mime === "application/pdf") {
@@ -286,14 +288,17 @@ export class MantleMessagesConverter {
           source: {
             type: "base64",
             media_type: "application/pdf",
-            data: attachmentBase64(attachment),
+            data: this.attachmentFormatter.base64(attachment),
           },
         });
       } else {
         unsupported.push(attachment);
       }
     }
-    const withPlaceholders = textWithUnsupportedAttachments(text, unsupported);
+    const withPlaceholders = this.attachmentFormatter.textWithUnsupported(
+      text,
+      unsupported,
+    );
     if (withPlaceholders) {
       blocks.unshift({ type: "text", text: withPlaceholders });
     }
