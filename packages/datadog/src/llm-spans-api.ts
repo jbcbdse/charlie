@@ -168,8 +168,12 @@ export class LlmSpansApi {
       duration: event.timeMs * 1e6,
       meta: {
         kind: "agent",
-        input: { messages: runData.inputMessages.map(this.toMessage).flat() },
-        output: { messages: event.messages.map(this.toMessage).flat() },
+        input: {
+          messages: runData.inputMessages.map((m) => this.toMessage(m)).flat(),
+        },
+        output: {
+          messages: event.messages.map((m) => this.toMessage(m)).flat(),
+        },
         metadata: {
           model_name: event.context.modelId,
         },
@@ -254,8 +258,12 @@ export class LlmSpansApi {
       duration: Math.max(event.timeMs * 1e6, this.minDuration),
       meta: {
         kind: "llm",
-        input: { messages: event.messages.map(this.toMessage).flat() },
-        output: { messages: event.responseMessages.map(this.toMessage).flat() },
+        input: {
+          messages: event.messages.map((m) => this.toMessage(m)).flat(),
+        },
+        output: {
+          messages: event.responseMessages.map((m) => this.toMessage(m)).flat(),
+        },
         metadata: {
           model_name: event.modelId,
           model_provider: event.modelProvider,
