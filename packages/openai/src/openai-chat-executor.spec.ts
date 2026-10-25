@@ -1,5 +1,11 @@
-import { EventName, EventProducer, StreamChunk } from "@jbcbdse/charlie-core";
+import {
+  EventName,
+  EventProducer,
+  ITool,
+  StreamChunk,
+} from "@jbcbdse/charlie-core";
 import { OpenAiChatExecutor } from "./openai-chat-executor";
+import { OpenAiCompletionsRequest } from "./types";
 
 function asyncChunks<T>(parts: T[]): AsyncIterable<T> {
   return {
@@ -480,5 +486,58 @@ describe("OpenAiChatExecutor streaming", () => {
         ],
       }),
     );
+  });
+});
+
+describe("OpenAiChatExecutor reasoning_effort", () => {
+  const tool: ITool = {
+    name: "CalculatorTool",
+    description: "math",
+    jsonSchema: { type: "object", properties: {} },
+    handle: async () => "ok",
+  };
+
+  async function sentRequest(
+    options: { modelId: string; reasoningEffort?: "low" },
+    withTools: boolean,
+  ) {
+    const create = jest
+      .fn()
+      .mockResolvedValue(
+        asyncChunks([{ choices: [{ delta: { content: "ok" } }] }]),
+      );
+    const executor = new OpenAiChatExecutor({
+      ...options,
+      openAiClient: { chat: { completions: { create } } } as never,
+    });
+    await executor.execute({
+      messages: [{ role: "user", content: "hi" }],
+      tools: withTools ? [tool] : undefined,
+      context: context(new EventProducer()),
+    });
+    return create.mock.calls[0][0] as OpenAiCompletionsRequest;
+  }
+
+  it("sets reasoning_effort none for grok models when tools are present", async () => {
+    const request = await sentRequest({ modelId: "xai.grok-4.3" }, true);
+    expect(request.reasoning_effort).toBe("none");
+  });
+
+  it("omits reasoning_effort for grok when tools are absent", async () => {
+    const request = await sentRequest({ modelId: "grok-4.3" }, false);
+    expect(request.reasoning_effort).toBeUndefined();
+  });
+
+  it("does not default reasoning_effort for non-grok models with tools", async () => {
+    const request = await sentRequest({ modelId: "gpt-5.6" }, true);
+    expect(request.reasoning_effort).toBeUndefined();
+  });
+
+  it("uses an explicit reasoningEffort when tools are present", async () => {
+    const request = await sentRequest(
+      { modelId: "gpt-5.6", reasoningEffort: "low" },
+      true,
+    );
+    expect(request.reasoning_effort).toBe("low");
   });
 });
