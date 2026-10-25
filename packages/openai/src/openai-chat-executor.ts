@@ -1,5 +1,9 @@
 import OpenAI from "openai";
-import { OpenAiChatMessage, OpenAiCompletionsRequest } from "./types";
+import {
+  OpenAiChatMessage,
+  OpenAiCompletionsRequest,
+  OpenAiReasoningEffort,
+} from "./types";
 import {
   Attachment,
   AttachmentFormatter,
@@ -12,6 +16,7 @@ import {
   CharlieStreamConsumer,
   CharlieStreamPart,
   ToolChoice,
+  ITool,
 } from "@jbcbdse/charlie-core";
 import {
   isOpenAiNativeMime,
@@ -30,6 +35,8 @@ export interface OpenAiChatExecutorOptions {
   dangerouslyAllowBrowser?: boolean;
   maxRetries?: number;
   timeout?: number;
+  /** Sent on chat completions when tools are present. Grok defaults to "none". */
+  reasoningEffort?: OpenAiReasoningEffort;
 }
 export class OpenAiChatExecutor implements ChatExecutor {
   private openAiClient: OpenAI;
@@ -82,6 +89,10 @@ export class OpenAiChatExecutor implements ChatExecutor {
         ? this.toOpenAiToolChoice(toolChoice)
         : undefined,
     };
+    const reasoningEffort = this.reasoningEffortForTools(tools);
+    if (reasoningEffort) {
+      request.reasoning_effort = reasoningEffort;
+    }
     const chatExecutorStartMs = Date.now();
     context.eventProducer.emit(EventName.ChatRawRequest, {
       context,
@@ -106,6 +117,24 @@ export class OpenAiChatExecutor implements ChatExecutor {
       timeMs: Date.now() - chatExecutorStartMs,
     });
     return result;
+  }
+
+  /**
+   * Grok chat completions reject function tools unless reasoning_effort is "none".
+   */
+  private reasoningEffortForTools(
+    tools: ITool[] | undefined,
+  ): OpenAiReasoningEffort | undefined {
+    if (!tools?.length) {
+      return undefined;
+    }
+    if (this.options.reasoningEffort) {
+      return this.options.reasoningEffort;
+    }
+    if (/grok/i.test(this.modelId)) {
+      return "none";
+    }
+    return undefined;
   }
 
   private async *toCharlieStream(
